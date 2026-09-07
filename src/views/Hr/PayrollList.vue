@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Payroll" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Payroll" subtitle="Periode penggajian" back-to="/">
+    <MobilePageHeader title="Payroll" subtitle="Periode penggajian" back-to="/quick-menu/karyawan">
       <template #actions>
         <button
           @click="$router.push('/hr/payroll/period/new')"
@@ -68,20 +68,28 @@
               <span class="rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase" :class="getStatusBadge(p.status)">{{ statusLabel(p.status) }}</span>
             </td>
             <td class="px-4 py-3 text-right">
-              <button
-                v-if="p.status === 'draft'"
-                @click.stop="handleGenerate(p.id)"
-                class="rounded-lg border border-amber-300 px-2.5 py-1 text-[9px] font-medium text-amber-700 hover:bg-amber-50 dark:border-amber-500/30 dark:text-amber-400 dark:hover:bg-amber-500/10"
-              >
-                Generate
-              </button>
-              <button
-                v-if="p.status === 'generated'"
-                @click.stop="handlePost(p.id)"
-                class="rounded-lg border border-emerald-300 px-2.5 py-1 text-[9px] font-medium text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/30 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
-              >
-                Jurnal
-              </button>
+              <div class="flex items-center justify-end gap-2">
+                <button
+                  v-if="p.status === 'draft'"
+                  @click.stop="handleGenerate(p.id)"
+                  class="rounded-lg border border-amber-300 px-2.5 py-1 text-[9px] font-medium text-amber-700 hover:bg-amber-50 dark:border-amber-500/30 dark:text-amber-400 dark:hover:bg-amber-500/10"
+                >
+                  Generate
+                </button>
+                <button
+                  v-if="p.status === 'generated'"
+                  @click.stop="handlePost(p.id)"
+                  class="rounded-lg border border-emerald-300 px-2.5 py-1 text-[9px] font-medium text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/30 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                >
+                  Jurnal
+                </button>
+                <button
+                  @click.stop="handleDelete(p.id)"
+                  class="rounded-lg border border-red-300 px-2.5 py-1 text-[9px] font-medium text-red-700 hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10"
+                >
+                  Hapus
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -89,7 +97,7 @@
     </div>
 
     <!-- Mobile Cards -->
-    <div v-else class="grid grid-cols-1 gap-3 md:hidden">
+    <div v-if="store.payrollPeriods.length > 0" class="grid grid-cols-1 gap-3 md:hidden">
       <div
         v-for="p in sortedPeriods"
         :key="p.id"
@@ -128,6 +136,12 @@
           >
             Post Jurnal
           </button>
+          <button
+            @click.stop="handleDelete(p.id)"
+            class="rounded-lg bg-red-100 px-2.5 py-1 text-[9px] font-medium text-red-700 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400"
+          >
+            Hapus
+          </button>
         </div>
       </div>
     </div>
@@ -138,7 +152,6 @@
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
 import { computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
@@ -146,7 +159,6 @@ import { useHrStore } from '@/stores/hr'
 
 const { confirm } = useConfirm()
 const toast = useToast()
-const router = useRouter()
 const store = useHrStore()
 const loading = computed(() => store.loading)
 
@@ -185,6 +197,19 @@ const handlePost = async (periodId: string) => {
   if (!(await confirm('Post jurnal akuntansi untuk payroll ini?'))) return
   try {
     await store.postPayrollJournal(periodId)
+  } catch (e: any) { toast.error('Gagal!', e.message) }
+}
+
+const handleDelete = async (periodId: string) => {
+  const period = store.payrollPeriods.find((p) => p.id === periodId)
+  const msg = period?.status === 'paid'
+    ? 'Hapus payroll ini? Jurnal akuntansi yang sudah diposting juga akan ikut terhapus.'
+    : 'Hapus payroll ini? Semua data slip gaji akan ikut terhapus.'
+
+  if (!(await confirm(msg))) return
+  try {
+    await store.deletePayrollPeriod(periodId)
+    toast.success('Berhasil!', 'Payroll berhasil dihapus')
   } catch (e: any) { toast.error('Gagal!', e.message) }
 }
 

@@ -40,7 +40,7 @@
         </div>
 
         <!-- Actions -->
-        <div v-if="period.status === 'draft' || period.status === 'generated'" class="mt-3 flex gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
+        <div class="mt-3 flex gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
           <button
             v-if="period.status === 'draft'"
             @click="handleGenerate"
@@ -56,6 +56,13 @@
             class="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
             Post Jurnal Akuntansi
+          </button>
+          <button
+            @click="handleDelete"
+            :disabled="store.loading"
+            class="rounded-xl border border-red-300 px-4 py-2.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10"
+          >
+            Hapus
           </button>
         </div>
       </div>
@@ -81,7 +88,6 @@
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
               <th class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Karyawan</th>
-              <th class="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Gaji Pokok</th>
               <th class="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Tunjangan</th>
               <th class="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Potongan</th>
               <th class="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Net</th>
@@ -91,7 +97,6 @@
           <tbody>
             <tr v-for="p in filteredPayrolls" :key="p.id" @click="expandedPayrollId = expandedPayrollId === p.id ? null : p.id" class="cursor-pointer border-b border-gray-100 transition hover:bg-blue-50/50 dark:border-gray-800 dark:hover:bg-blue-500/5">
               <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ p.employee?.name || '-' }}</td>
-              <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{{ formatCurrency(p.base_salary) }}</td>
               <td class="px-4 py-3 text-right text-emerald-600">{{ formatCurrency(p.total_allowance) }}</td>
               <td class="px-4 py-3 text-right text-red-600">{{ formatCurrency(p.total_deduction) }}</td>
               <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">{{ formatCurrency(p.total_net) }}</td>
@@ -100,7 +105,7 @@
               </td>
             </tr>
             <tr v-if="expandedPayrollId" class="bg-gray-50 dark:bg-gray-800">
-              <td colspan="6" class="px-4 py-3">
+              <td colspan="5" class="px-4 py-3">
                 <div v-if="expandedPayroll" class="space-y-1.5">
                   <div v-for="item in expandedPayroll.items || []" :key="item.id" class="flex items-center justify-between text-[11px]">
                     <span class="text-gray-600 dark:text-gray-400">{{ item.component_name }}</span>
@@ -117,7 +122,7 @@
       </div>
 
       <!-- Mobile Cards -->
-      <div v-else class="mt-4 grid grid-cols-1 gap-3 md:hidden">
+      <div v-if="filteredPayrolls.length > 0" class="mt-4 grid grid-cols-1 gap-3 md:hidden">
         <div
           v-for="p in filteredPayrolls"
           :key="p.id"
@@ -135,10 +140,6 @@
             </div>
           </div>
           <div v-if="expandedPayrollId === p.id" class="mt-2 space-y-1.5 border-t border-gray-200 pt-2 dark:border-gray-700">
-            <div class="flex justify-between text-[10px]">
-              <span class="text-gray-500">Gaji Pokok</span>
-              <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(p.base_salary) }}</span>
-            </div>
             <div class="flex justify-between text-[10px]">
               <span class="text-gray-500">Tunjangan</span>
               <span class="font-medium text-emerald-600">{{ formatCurrency(p.total_allowance) }}</span>
@@ -225,12 +226,32 @@ const handlePost = async () => {
   } catch (e: any) { toast.error('Gagal!', e.message) }
 }
 
+const handleDelete = async () => {
+  const msg = period.value?.status === 'paid'
+    ? 'Hapus payroll ini? Jurnal akuntansi yang sudah diposting juga akan ikut terhapus.'
+    : 'Hapus payroll ini? Semua data slip gaji akan ikut terhapus.'
+
+  if (!(await confirm(msg))) return
+  try {
+    await store.deletePayrollPeriod(route.params.id as string)
+    toast.success('Berhasil!', 'Payroll berhasil dihapus')
+    await new Promise(resolve => setTimeout(resolve, 500))
+    window.location.href = '/hr/payroll'
+  } catch (e: any) { toast.error('Gagal!', e.message) }
+}
+
 onMounted(async () => {
-  await Promise.all([
-    store.fetchPayrollPeriods(),
-    store.fetchPayrolls(route.params.id as string),
-    store.fetchEmployees(),
-  ])
-  loading.value = false
+  try {
+    await Promise.all([
+      store.fetchPayrollPeriods(),
+      store.fetchPayrolls(route.params.id as string),
+      store.fetchEmployees(),
+    ])
+  } catch (e: any) {
+    toast.error('Gagal memuat data!', e.message)
+  } finally {
+    // WAJIB di finally — kalau fetch gagal, spinner berhenti & tampil empty state
+    loading.value = false
+  }
 })
 </script>

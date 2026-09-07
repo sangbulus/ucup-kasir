@@ -21,7 +21,6 @@ import type {
   PayrollPeriodInsert,
   PayrollPeriodUpdate,
   Payroll,
-  PayrollInsert,
   PayrollItem,
   PayrollSummary,
 } from '@/types/database'
@@ -460,10 +459,18 @@ export const sqliteHrService = {
   async fetchPayrollComponents(): Promise<PayrollComponent[]> {
     const userId = getCurrentUserId()
     const rows = await query<any>(
-      `SELECT * FROM payroll_components WHERE user_id = ? ORDER BY type, name`,
+      `SELECT pc.*, p.name AS position_name, e.name AS employee_name
+       FROM payroll_components pc
+       LEFT JOIN positions p ON p.id = pc.position_id
+       LEFT JOIN employees e ON e.id = pc.employee_id
+       WHERE pc.user_id = ? ORDER BY pc.type, pc.name`,
       [userId]
     )
-    return rows.map(this.mapPayrollComponent)
+    return rows.map((r) => ({
+      ...this.mapPayrollComponent(r),
+      position: r.position_name ? { name: r.position_name } : null,
+      employee: r.employee_name ? { name: r.employee_name } : null,
+    }))
   },
 
   async createPayrollComponent(input: PayrollComponentInsert): Promise<PayrollComponent> {
@@ -601,10 +608,33 @@ export const sqliteHrService = {
 
   async deletePayrollPeriod(id: string): Promise<void> {
     const userId = getCurrentUserId()
+    const period = await this.getPayrollPeriod(id)
+    if (!period) throw new Error('Periode payroll tidak ditemukan')
+
+    // Jika sudah paid, hapus jurnal terkait terlebih dahulu
+    if (period.status === 'paid') {
+      await run(
+        `DELETE FROM journal_lines WHERE journal_id IN (SELECT id FROM journal_entries WHERE reference_type = 'payroll' AND reference_id = ? AND user_id = ?)`,
+        [id, userId]
+      )
+      await run(
+        `DELETE FROM journal_entries WHERE reference_type = 'payroll' AND reference_id = ? AND user_id = ?`,
+        [id, userId]
+      )
+    }
+
+    // Hapus payroll items & payrolls
     await run(`DELETE FROM payroll_items WHERE payroll_id IN (SELECT id FROM payrolls WHERE period_id = ? AND user_id = ?)`, [id, userId])
     await run(`DELETE FROM payrolls WHERE period_id = ? AND user_id = ?`, [id, userId])
     await run(`DELETE FROM payroll_periods WHERE id = ? AND user_id = ?`, [id, userId])
     await addToSyncQueue('DELETE', 'payroll_periods', id, { id })
+  },
+
+  async deletePayroll(id: string): Promise<void> {
+    const userId = getCurrentUserId()
+    await run(`DELETE FROM payroll_items WHERE payroll_id = ? AND user_id = ?`, [id, userId])
+    await run(`DELETE FROM payrolls WHERE id = ? AND user_id = ?`, [id, userId])
+    await addToSyncQueue('DELETE', 'payrolls', id, { id })
   },
 
   // ============================================================
@@ -688,15 +718,6 @@ export const sqliteHrService = {
     if (!period) throw new Error('Periode payroll tidak ditemukan')
     if (period.status === 'paid') throw new Error('Periode payroll sudah dibayar, tidak bisa digenerate ulang')
 
-    // Hitung hari kerja (Senin-Jumat) dalam periode
-    const start = new Date(period.start_date)
-    const end = new Date(period.end_date)
-    let workingDays = 0
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const day = d.getDay()
-      if (day >= 1 && day <= 5) workingDays++
-    }
-
     // Hapus payroll lama untuk periode ini (regenerate)
     await run(
       `DELETE FROM payroll_items WHERE payroll_id IN (SELECT id FROM payrolls WHERE period_id = ? AND user_id = ?)`,
@@ -735,6 +756,41 @@ export const sqliteHrService = {
       attByEmp.set(a.employee_id, list)
     }
 
+    // ---- Prefetch insentif bongkar muat (sebelum loop karyawan, hindari N×query) ----
+    // Sumber: surat jalan status 'selesai' dalam periode.
+    // Nilai muatan = Σ(delivery_load_items.quantity × unit_price);
+    // upah per orang per DO = CEIL(nilai ÷ jumlah tim muat).
+    const doRows = await query<any>(
+      `SELECT dor.id,
+              COALESCE((SELECT SUM(li.quantity * li.unit_price) FROM delivery_load_items li WHERE li.delivery_order_id = dor.id), 0) as nilai,
+              (SELECT COUNT(*) FROM delivery_loaders l WHERE l.delivery_order_id = dor.id) as orang
+       FROM delivery_orders dor
+       WHERE dor.user_id = ? AND dor.status = 'selesai'
+         AND dor.do_date >= ? AND dor.do_date <= ?`,
+      [userId, period.start_date, period.end_date]
+    )
+
+    // Peta: employee → total insentif (digabung antar DO, CEIL per DO)
+    const loaderRows = await query<any>(
+      `SELECT l.delivery_order_id, l.employee_id
+       FROM delivery_loaders l
+       WHERE l.user_id = ? AND l.delivery_order_id IN (${doRows.length > 0 ? doRows.map(() => '?').join(',') : "''"})`,
+      doRows.length > 0 ? [userId, ...doRows.map((d: any) => d.id)] : [userId]
+    )
+    const doById = new Map<string, any>()
+    for (const d of doRows) doById.set(d.id, d)
+
+    const insentifByEmp = new Map<string, number>()
+    for (const l of loaderRows) {
+      const dor = doById.get(l.delivery_order_id)
+      if (!dor) continue
+      const nilai = Number(dor.nilai) || 0
+      const orang = Number(dor.orang) || 0
+      if (orang <= 0 || nilai <= 0) continue
+      const upah = Math.ceil(nilai / orang)
+      insentifByEmp.set(l.employee_id, (insentifByEmp.get(l.employee_id) || 0) + upah)
+    }
+
     const createdPayrolls: Payroll[] = []
 
     for (const emp of employees) {
@@ -743,6 +799,14 @@ export const sqliteHrService = {
       let totalAllowance = 0
       let totalDeduction = 0
       const items: PayrollItem[] = []
+
+      // Insert baris payroll TERLEBIH DAHULU — payroll_items punya FK ke payrolls
+      // dan PRAGMA foreign_keys aktif, jadi item tidak boleh insert sebelum induknya.
+      await run(
+        `INSERT INTO payrolls (id, user_id, period_id, employee_id, base_salary, total_allowance, total_deduction, total_gross, total_net, status, created_at, updated_at, sync_status, updated_at_local)
+         VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, 'draft', ?, ?, 'pending', ?)`,
+        [payrollId, userId, periodId, emp.id, grossSalary, grossSalary, grossSalary, now, now, now]
+      )
 
       // Hitung komponen
       for (const comp of components) {
@@ -777,14 +841,35 @@ export const sqliteHrService = {
         else totalDeduction += amount
       }
 
+      // ---- Insentif bongkar muat (satu baris gabungan, tunjangan) ----
+      const insentif = insentifByEmp.get(emp.id) || 0
+      if (insentif > 0) {
+        const insentifItemId = uuid()
+        await run(
+          `INSERT INTO payroll_items (id, user_id, payroll_id, component_id, component_name, component_type, amount, created_at, sync_status, updated_at_local)
+           VALUES (?, ?, ?, NULL, 'Insentif Bongkar Muat', 'tunjangan', ?, ?, 'pending', ?)`,
+          [insentifItemId, userId, payrollId, insentif, now, now]
+        )
+        items.push({
+          id: insentifItemId,
+          user_id: userId,
+          payroll_id: payrollId,
+          component_id: undefined,
+          component_name: 'Insentif Bongkar Muat',
+          component_type: 'tunjangan',
+          amount: insentif,
+          created_at: now,
+        })
+        totalAllowance += insentif
+      }
+
       const totalGross = grossSalary + totalAllowance
       const totalNet = Math.max(0, totalGross - totalDeduction)
 
-      // Simpan payroll
+      // Update total pada baris payroll yang sudah dibuat
       await run(
-        `INSERT INTO payrolls (id, user_id, period_id, employee_id, base_salary, total_allowance, total_deduction, total_gross, total_net, status, created_at, updated_at, sync_status, updated_at_local)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, 'pending', ?)`,
-        [payrollId, userId, periodId, emp.id, grossSalary, totalAllowance, totalDeduction, totalGross, totalNet, now, now, now]
+        `UPDATE payrolls SET total_allowance = ?, total_deduction = ?, total_gross = ?, total_net = ?, updated_at = ?, updated_at_local = ? WHERE id = ?`,
+        [totalAllowance, totalDeduction, totalGross, totalNet, now, now, payrollId]
       )
 
       createdPayrolls.push({
@@ -817,6 +902,14 @@ export const sqliteHrService = {
     )
 
     await addToSyncQueue('UPDATE', 'payroll_periods', periodId, { id: periodId, status: 'generated' })
+    // Slip & item yang baru dibuat juga harus ikut tersinkron ke cloud,
+    // kalau tidak, generate payroll di HP tidak pernah muncul di web.
+    for (const p of createdPayrolls) {
+      await addToSyncQueue('INSERT', 'payrolls', p.id, p)
+      for (const item of p.items || []) {
+        await addToSyncQueue('INSERT', 'payroll_items', item.id, item)
+      }
+    }
 
     return createdPayrolls
   },
