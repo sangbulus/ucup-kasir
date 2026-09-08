@@ -1032,6 +1032,70 @@ const handleSubmit = async () => {
     return
   }
 
+  // CRITICAL FIX: Validasi semua quantity sebelum submit
+  // Pastikan semua draft quantity ter-commit ke item.quantity
+  cartItems.forEach(item => validateQuantity(item))
+
+  // Cek apakah ada item dengan quantity invalid (0 atau negatif)
+  const invalidItems = cartItems.filter(item => !item.quantity || item.quantity <= 0)
+  if (invalidItems.length > 0) {
+    toast.error('Gagal!', 'Ada item dengan jumlah tidak valid. Pastikan semua quantity > 0')
+    return
+  }
+
+  // Cek apakah ada item dengan quantity melebihi stok
+  const overStockItems = cartItems.filter(item => item.quantity > item.stock)
+  if (overStockItems.length > 0) {
+    const itemNames = overStockItems.map(item => `${item.name} (stok: ${item.stock})`).join(', ')
+    toast.error('Gagal!', `Quantity melebihi stok untuk: ${itemNames}`)
+    return
+  }
+
+  // P1 FIX: Validasi limit kredit di frontend (jika ada sisa pembayaran)
+  const remaining = Math.max(netTotal.value - (payment.value?.amount || 0), 0)
+  if (selectedCustomer.value && remaining > 0) {
+    try {
+      // Ambil total hutang customer saat ini
+      const customerTransactions = await transactionsStore.getTransactionsByCustomer(selectedCustomer.value.id)
+      const currentDebt = customerTransactions
+        .filter(t => t.status !== 'batal')
+        .reduce((sum, t) => sum + (t.remaining_amount || 0), 0)
+
+      // Tentukan limit kredit efektif
+      let creditLimit = selectedCustomer.value.credit_limit || 0
+
+      // Jika limit customer = 0, cek default dari settings (asumsi ada di localStorage atau fetch)
+      // Untuk sementara kita skip default settings check, langsung 0 = unlimited
+
+      // Validasi limit (jika > 0 berarti ada batasan)
+      if (creditLimit > 0) {
+        const totalDebtAfter = currentDebt + remaining
+
+        if (totalDebtAfter > creditLimit) {
+          toast.error(
+            'Limit Kredit Terlampaui',
+            `Hutang saat ini: Rp ${currentDebt.toLocaleString('id-ID')}, ` +
+            `Sisa transaksi ini: Rp ${remaining.toLocaleString('id-ID')}, ` +
+            `Limit: Rp ${creditLimit.toLocaleString('id-ID')}`
+          )
+          return
+        }
+
+        // Warning jika mendekati limit (> 80%)
+        const usagePercent = (totalDebtAfter / creditLimit) * 100
+        if (usagePercent > 80 && usagePercent <= 100) {
+          toast.warning(
+            'Mendekati Limit',
+            `Penggunaan kredit: ${usagePercent.toFixed(0)}% dari limit`
+          )
+        }
+      }
+    } catch (error) {
+      console.warn('Gagal validasi limit kredit:', error)
+      // Lanjut saja, jangan blokir transaksi jika gagal fetch
+    }
+  }
+
   isSubmitting.value = true
   try {
     const selectedCustomer = customersStore.customers.find(

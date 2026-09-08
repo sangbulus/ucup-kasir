@@ -34,16 +34,16 @@
       <!-- Account Selector (Desktop) -->
       <div class="mb-4 hidden items-center justify-between gap-3 md:flex">
         <div class="relative w-full max-w-md">
-          <select
-            :value="selectedAccount?.id || ''"
-            @change="handleAccountSelect(($event.target as HTMLSelectElement).value)"
-            class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-          >
-            <option value="" disabled>Pilih akun...</option>
-            <option v-for="acc in store.accounts" :key="acc.id" :value="acc.id">
-              {{ acc.code }} — {{ acc.name }}
-            </option>
-          </select>
+          <SelectField
+            :model-value="selectedAccount?.id || ''"
+            :options="store.accounts.map((acc) => ({ label: `${acc.code} — ${acc.name}`, value: acc.id }))"
+            title="Pilih Akun"
+            placeholder="Pilih akun..."
+            searchable
+            search-placeholder="Cari akun..."
+            button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            @update:model-value="handleAccountSelect(String($event))"
+          />
         </div>
         <div class="flex items-center gap-2">
           <button
@@ -288,18 +288,18 @@
         <div class="space-y-4">
           <div>
             <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">Dari</label>
-            <input
-              type="date"
+            <DateField
               v-model="tempStart"
-              class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              title="Tanggal Mulai"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">Sampai</label>
-            <input
-              type="date"
+            <DateField
               v-model="tempEnd"
-              class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              title="Tanggal Selesai"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
           </div>
 
@@ -329,6 +329,8 @@ import { useRouter, useRoute } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DateField from '@/components/common/DateField.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useFinanceStore } from '@/stores/finance'
 import type { Account } from '@/types/database'
 
@@ -413,7 +415,7 @@ const getTypeBg = (type: string) => {
 const getRefLabel = (ref: string) => {
   const labels: Record<string, string> = {
     manual: 'Manual', transaction: 'Penjualan', return: 'Retur',
-    payment: 'Pembayaran', void: 'Pembatalan',
+    payment: 'Pembayaran',
   }
   return labels[ref] || ref
 }
@@ -424,7 +426,6 @@ const getRefBadge = (ref: string) => {
     transaction: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400',
     return: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
     payment: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
-    void: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400',
   }
   return badges[ref] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
 }

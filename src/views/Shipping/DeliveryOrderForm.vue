@@ -87,17 +87,38 @@
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Sopir <span class="text-red-500">*</span></label>
-            <select v-model="form.driver_id" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="">Pilih sopir</option>
-              <option v-for="emp in driverOptions" :key="emp.id" :value="emp.id">{{ emp.name }}</option>
-            </select>
+            <SelectField
+              v-model="form.driver_id"
+              :options="driverOptions.map((emp) => ({ label: emp.name, value: emp.id }))"
+              title="Pilih Sopir"
+              placeholder="Pilih sopir"
+              searchable
+              search-placeholder="Cari sopir..."
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Kendaraan <span class="text-red-500">*</span></label>
-            <select v-model="form.vehicle_id" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="">Pilih kendaraan</option>
-              <option v-for="v in vehicleOptions" :key="v.id" :value="v.id">{{ v.plate_number }} — {{ v.vehicle_type }}</option>
-            </select>
+            <SelectField
+              v-model="form.vehicle_id"
+              :options="vehicleOptions.map((v) => ({ label: `${v.plate_number} — ${v.vehicle_type}`, value: v.id }))"
+              title="Pilih Kendaraan"
+              placeholder="Pilih kendaraan"
+              searchable
+              search-placeholder="Cari kendaraan..."
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Gaji Sopir</label>
+            <input
+              :value="formatInputNumber(form.driver_fee)"
+              @input="(e) => updateDriverFee(e)"
+              type="text"
+              inputmode="numeric"
+              class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              placeholder="0"
+            />
           </div>
           <div class="sm:col-span-2">
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Catatan</label>
@@ -155,10 +176,15 @@
         <h3 class="mb-1 text-sm font-bold text-gray-900 dark:text-white">Tim Muat</h3>
         <p class="mb-3 text-[11px] text-gray-500 dark:text-gray-400">Karyawan yang ikut memuat. Upah dibagi rata ke seluruh anggota tim.</p>
         <div class="mb-3 flex gap-2">
-          <select v-model="loaderToAdd" class="flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-            <option value="">Pilih karyawan</option>
-            <option v-for="emp in availableLoaderOptions" :key="emp.id" :value="emp.id">{{ emp.name }}</option>
-          </select>
+          <SelectField
+            v-model="loaderToAdd"
+            :options="availableLoaderOptions.map((emp) => ({ label: emp.name, value: emp.id }))"
+            title="Pilih Karyawan"
+            placeholder="Pilih karyawan"
+            searchable
+            search-placeholder="Cari karyawan..."
+            button-class="flex flex-1 items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          />
           <button @click="addLoader" :disabled="!loaderToAdd" class="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50">Tambah</button>
         </div>
         <div v-if="loaders.length === 0" class="rounded-xl border border-dashed border-gray-300 py-6 text-center dark:border-gray-700">
@@ -213,6 +239,7 @@ import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import TransactionSearchDialog from '@/components/shipping/TransactionSearchDialog.vue'
 import ProductSearchDialog from '@/components/shipping/ProductSearchDialog.vue'
 import DatePickerModal from '@/components/common/DatePickerModal.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useShippingStore } from '@/stores/shipping'
 import { useHrStore } from '@/stores/hr'
 import { useTransactionsStore } from '@/stores/transactions'
@@ -247,6 +274,7 @@ const form = reactive({
   do_date: new Date().toISOString().slice(0, 10),
   vehicle_id: '',
   driver_id: '',
+  driver_fee: 0,
   notes: '',
 })
 
@@ -306,8 +334,16 @@ const updateUnitPrice = (item: any, event: Event) => {
   item.unit_price = rawValue ? parseInt(rawValue) : 0
 }
 
+const updateDriverFee = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const rawValue = input.value.replace(/\D/g, '')
+  form.driver_fee = rawValue ? parseInt(rawValue) : 0
+}
+
 const onTransactionsConfirm = (ids: string[]) => {
   selectedTransactionIds.value = ids
+  // Auto-load items dari transaksi yang dipilih
+  loadItemsFromTransactions(ids)
 }
 
 const removeTransaction = (txId: string) => {
@@ -315,6 +351,38 @@ const removeTransaction = (txId: string) => {
   if (idx > -1) {
     selectedTransactionIds.value.splice(idx, 1)
   }
+}
+
+const loadItemsFromTransactions = (txIds: string[]) => {
+  // Kumpulkan semua item dari transaksi yang dipilih
+  const itemsMap = new Map<string, { product_id: string; product_name: string; quantity: number }>()
+
+  txIds.forEach((txId) => {
+    const transaction = (tx.transactions || []).find((t: any) => t.id === txId)
+    if (!transaction || !transaction.items) return
+
+    transaction.items.forEach((item: any) => {
+      const key = item.product_id || item.product_name
+      if (itemsMap.has(key)) {
+        // Jika produk sudah ada, tambahkan quantity
+        const existing = itemsMap.get(key)!
+        existing.quantity += item.quantity || 0
+      } else {
+        // Produk baru
+        itemsMap.set(key, {
+          product_id: item.product_id || '',
+          product_name: item.product_name || '',
+          quantity: item.quantity || 0
+        })
+      }
+    })
+  })
+
+  // Convert map ke array dan tambahkan unit_price dari settings
+  loadItems.value = Array.from(itemsMap.values()).map((item) => ({
+    ...item,
+    unit_price: settingsStore.loadingRatePerSack || 0
+  }))
 }
 
 const onProductSelect = (product: Product) => {
@@ -356,6 +424,7 @@ const handleSave = async (status: 'draft' | 'disiapkan') => {
       vehicle_id: form.vehicle_id,
       driver_id: form.driver_id,
       driver_name: driverOptions.value.find((d) => d.id === form.driver_id)?.name || null,
+      driver_fee: form.driver_fee || 0,
       notes: form.notes || null,
       status,
     }
@@ -397,6 +466,15 @@ onMounted(async () => {
     settingsStore.loaded ? Promise.resolve() : settingsStore.fetchSettings(),
   ])
 
+  // Handle query params dari PendingShipmentList
+  if (route.query.tx && typeof route.query.tx === 'string') {
+    const txIds = route.query.tx.split(',').filter(Boolean)
+    if (txIds.length > 0) {
+      selectedTransactionIds.value = txIds
+      loadItemsFromTransactions(txIds)
+    }
+  }
+
   if (isEdit.value && doId) {
     const d = await shipping.getDeliveryOrder(doId)
     if (d) {
@@ -404,6 +482,7 @@ onMounted(async () => {
       form.do_date = d.do_date || new Date().toISOString().slice(0, 10)
       form.vehicle_id = d.vehicle_id || ''
       form.driver_id = d.driver_id || ''
+      form.driver_fee = d.driver_fee || 0
       form.notes = d.notes || ''
       selectedTransactionIds.value = [...(d.transaction_ids || [])]
       loaders.value = (d.loaders || []).map((l) => ({

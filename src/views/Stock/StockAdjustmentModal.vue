@@ -215,16 +215,13 @@
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Alasan <span class="text-error-500">*</span>
               </label>
-              <select
+              <SelectField
                 v-model="form.reason"
-                required
-                class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-white"
-              >
-                <option value="">Pilih alasan...</option>
-                <option v-for="reason in reasonOptions" :key="reason" :value="reason">
-                  {{ reason }}
-                </option>
-              </select>
+                :options="reasonOptions.map((reason) => ({ label: reason, value: reason }))"
+                title="Alasan Penyesuaian"
+                placeholder="Pilih alasan..."
+                button-class="mt-1 flex w-full items-center justify-between rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-white"
+              />
             </div>
 
             <!-- Catatan -->
@@ -290,6 +287,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import ProductPickerModal from '@/components/common/ProductPickerModal.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useStockStore } from '@/stores/stock'
 import { useProductsStore } from '@/stores/products'
 

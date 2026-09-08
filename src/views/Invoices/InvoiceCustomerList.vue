@@ -87,15 +87,17 @@
 
       <!-- Desktop Sort -->
       <div v-if="!loading && customersInKecamatan.length > 0" class="hidden items-center gap-2 md:flex">
-        <select
+        <SelectField
           v-model="sortOrder"
-          class="flex-1 appearance-none rounded-xl border border-gray-300 bg-white py-2.5 px-3 pr-8 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-        >
-          <option value="name-asc">Nama A-Z</option>
-          <option value="name-desc">Nama Z-A</option>
-          <option value="invoice-desc">Invoice Terbanyak</option>
-          <option value="invoice-asc">Invoice Tersedikit</option>
-        </select>
+          :options="[
+            { label: 'Nama A-Z', value: 'name-asc' },
+            { label: 'Nama Z-A', value: 'name-desc' },
+            { label: 'Invoice Terbanyak', value: 'invoice-desc' },
+            { label: 'Invoice Tersedikit', value: 'invoice-asc' },
+          ]"
+          title="Urutkan"
+          button-class="flex flex-1 items-center justify-between rounded-xl border border-gray-300 bg-white py-2.5 px-3 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+        />
       </div>
 
       <!-- Loading State -->
@@ -221,6 +223,7 @@ import { MessageCircle, Plus, Search } from 'lucide-vue-next'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useCustomersStore } from '@/stores/customers'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useToast } from '@/composables/useToast'

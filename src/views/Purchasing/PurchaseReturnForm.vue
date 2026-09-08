@@ -12,33 +12,54 @@
         <div class="space-y-3">
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Dari Faktur (opsional)</label>
-            <select v-model="selectedPIId" @change="onPISelect" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option :value="null">Tanpa referensi</option>
-              <option v-for="pi in store.purchaseInvoices" :key="pi.id" :value="pi.id">{{ pi.pi_number }} — {{ pi.supplier_name || 'Tanpa supplier' }}</option>
-            </select>
+            <SelectField
+              v-model="selectedPIId"
+              :options="[
+                { label: 'Tanpa referensi', value: null },
+                ...store.purchaseInvoices.map((pi) => ({ label: `${pi.pi_number} — ${pi.supplier_name || 'Tanpa supplier'}`, value: pi.id }))
+              ]"
+              title="Pilih Faktur Pembelian"
+              placeholder="Tanpa referensi"
+              searchable
+              search-placeholder="Cari faktur..."
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              @change="onPISelect"
+            />
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Supplier *</label>
-              <select v-model="form.supplier_id" :disabled="!!selectedPIId" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm disabled:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-900">
-                <option :value="null">Pilih supplier...</option>
-                <option v-for="s in store.suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
-              </select>
+              <SelectField
+                v-model="form.supplier_id"
+                :options="store.suppliers.map((s) => ({ label: s.name, value: s.id }))"
+                title="Pilih Supplier"
+                placeholder="Pilih supplier..."
+                searchable
+                search-placeholder="Cari supplier..."
+                :disabled="!!selectedPIId"
+                button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 disabled:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-900"
+              />
             </div>
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tanggal Retur *</label>
-              <input v-model="form.return_date" type="date" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+              <DateField v-model="form.return_date" title="Tanggal Retur" button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
             </div>
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Alasan *</label>
-            <select v-model="form.reason" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="cacat">Cacat</option>
-              <option value="salah_produk">Salah Produk</option>
-              <option value="kadaluarsa">Kadaluarsa</option>
-              <option value="rusak_kirim">Rusak Saat Kirim</option>
-              <option value="lainnya">Lainnya</option>
-            </select>
+            <SelectField
+              v-model="form.reason"
+              :options="[
+                { label: 'Cacat', value: 'cacat' },
+                { label: 'Salah Produk', value: 'salah_produk' },
+                { label: 'Kadaluarsa', value: 'kadaluarsa' },
+                { label: 'Rusak Saat Kirim', value: 'rusak_kirim' },
+                { label: 'Lainnya', value: 'lainnya' }
+              ]"
+              title="Alasan Retur"
+              placeholder="Pilih alasan..."
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
         </div>
       </div>
@@ -102,6 +123,8 @@ import AdminLayout from '@/components/layout/AdminLayout.vue'
 import CurrencyInput from '@/components/common/CurrencyInput.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DateField from '@/components/common/DateField.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { usePurchasingStore } from '@/stores/purchasing'
 import type { PurchaseReturnInput } from '@/types/database'
 

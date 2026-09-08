@@ -1,11 +1,5 @@
 import { supabase } from '@/lib/supabase'
 import type {
-  Department,
-  DepartmentInsert,
-  DepartmentUpdate,
-  Position,
-  PositionInsert,
-  PositionUpdate,
   Employee,
   EmployeeInsert,
   EmployeeUpdate,
@@ -21,130 +15,25 @@ import type {
   PayrollPeriodUpdate,
   Payroll,
   PayrollSummary,
+  EmployeeLoan,
+  EmployeeLoanInsert,
+  EmployeeLoanUpdate,
+  EmployeeLoanPayment,
+  EmployeeLoanPaymentInsert,
+  KasbonChoice,
+  KasbonDeductionResult,
 } from '@/types/database'
 
 // ============================================================
 // Service: HR & Payroll (Supabase)
-// - Master: Departemen, Jabatan, Karyawan
+// - Master: Karyawan (jabatan = teks 'supir' | 'loader', tanpa tabel)
 // - Absensi
 // - Komponen Payroll
-// - Payroll Period & Slip Gaji (via RPC generate_payroll / post_payroll_journal)
+// - Kasbon (employee_loans) + potongan otomatis saat payroll
+// - Payroll Period & Slip Gaji (via RPC generate_payroll / apply_kasbon_deductions / post_payroll_journal)
 // ============================================================
 
 export const hrService = {
-  // ============================================================
-  // DEPARTMENTS
-  // ============================================================
-
-  async fetchDepartments(): Promise<Department[]> {
-    const { data, error } = await supabase
-      .from('departments')
-      .select('*')
-      .order('name')
-    if (error) throw error
-    return (data || []) as Department[]
-  },
-
-  async getDepartment(id: string): Promise<Department | null> {
-    const { data, error } = await supabase
-      .from('departments')
-      .select('*')
-      .eq('id', id)
-      .single()
-    if (error) throw error
-    return data as Department
-  },
-
-  async createDepartment(input: DepartmentInsert): Promise<Department> {
-    const { data, error } = await supabase
-      .from('departments')
-      .insert({ ...input, is_active: input.is_active !== false })
-      .select()
-      .single()
-    if (error) throw error
-    return data as Department
-  },
-
-  async updateDepartment(id: string, updates: DepartmentUpdate): Promise<Department> {
-    const { data, error } = await supabase
-      .from('departments')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) throw error
-    return data as Department
-  },
-
-  async deleteDepartment(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('departments')
-      .delete()
-      .eq('id', id)
-    if (error) throw error
-  },
-
-  // ============================================================
-  // POSITIONS
-  // ============================================================
-
-  async fetchPositions(): Promise<Position[]> {
-    const { data, error } = await supabase
-      .from('positions')
-      .select('*')
-      .order('name')
-    if (error) throw error
-    return (data || []) as Position[]
-  },
-
-  async fetchPositionsWithDepartment(): Promise<Position[]> {
-    const { data, error } = await supabase
-      .from('positions')
-      .select('*, department:departments(name)')
-      .order('name')
-    if (error) throw error
-    return (data || []) as Position[]
-  },
-
-  async getPosition(id: string): Promise<Position | null> {
-    const { data, error } = await supabase
-      .from('positions')
-      .select('*')
-      .eq('id', id)
-      .single()
-    if (error) throw error
-    return data as Position
-  },
-
-  async createPosition(input: PositionInsert): Promise<Position> {
-    const { data, error } = await supabase
-      .from('positions')
-      .insert({ ...input, is_active: input.is_active !== false })
-      .select()
-      .single()
-    if (error) throw error
-    return data as Position
-  },
-
-  async updatePosition(id: string, updates: PositionUpdate): Promise<Position> {
-    const { data, error } = await supabase
-      .from('positions')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) throw error
-    return data as Position
-  },
-
-  async deletePosition(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('positions')
-      .delete()
-      .eq('id', id)
-    if (error) throw error
-  },
-
   // ============================================================
   // EMPLOYEES
   // ============================================================
@@ -152,7 +41,7 @@ export const hrService = {
   async fetchEmployees(): Promise<Employee[]> {
     const { data, error } = await supabase
       .from('employees')
-      .select('*, department:departments(name), position:positions(name)')
+      .select('*')
       .order('name')
     if (error) throw error
     return (data || []) as Employee[]
@@ -161,7 +50,7 @@ export const hrService = {
   async getEmployee(id: string): Promise<Employee | null> {
     const { data, error } = await supabase
       .from('employees')
-      .select('*, department:departments(name), position:positions(name)')
+      .select('*')
       .eq('id', id)
       .single()
     if (error) throw error
@@ -183,7 +72,7 @@ export const hrService = {
       .from('employees')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .select('*, department:departments(name), position:positions(name)')
+      .select('*')
       .single()
     if (error) throw error
     return data as Employee
@@ -303,7 +192,7 @@ export const hrService = {
   async fetchPayrollComponents(): Promise<PayrollComponent[]> {
     const { data, error } = await supabase
       .from('payroll_components')
-      .select('*, position:positions(name), employee:employees(name)')
+      .select('*, employee:employees(name)')
       .order('type')
       .order('name')
     if (error) throw error
@@ -404,7 +293,7 @@ export const hrService = {
   async fetchPayrolls(periodId: string): Promise<Payroll[]> {
     const { data, error } = await supabase
       .from('payrolls')
-      .select('*, items:payroll_items(*), employee:employees(name, employee_code, department_id, position_id, bank_name, bank_account_number, bank_account_name)')
+      .select('*, items:payroll_items(*), employee:employees(name, employee_code, position, bank_name, bank_account_number, bank_account_name)')
       .eq('period_id', periodId)
       .order('created_at')
     if (error) throw error
@@ -414,7 +303,7 @@ export const hrService = {
   async getPayroll(id: string): Promise<Payroll | null> {
     const { data, error } = await supabase
       .from('payrolls')
-      .select('*, items:payroll_items(*), employee:employees(name, employee_code, department_id, position_id, bank_name, bank_account_number, bank_account_name)')
+      .select('*, items:payroll_items(*), employee:employees(name, employee_code, position, bank_name, bank_account_number, bank_account_name)')
       .eq('id', id)
       .single()
     if (error) throw error
@@ -439,6 +328,17 @@ export const hrService = {
     return data as string
   },
 
+  /** Terapkan potongan kasbon ke payroll periode (RPC).
+   *  p_choices: { "<employee_id>": 'all' | 'half' | 'none' | "<nominal>" } */
+  async applyKasbonDeductions(periodId: string, choices: Record<string, KasbonChoice>): Promise<KasbonDeductionResult> {
+    const { data, error } = await supabase.rpc('apply_kasbon_deductions', {
+      p_period_id: periodId,
+      p_choices: choices,
+    })
+    if (error) throw error
+    return (data || { applied_count: 0, applied_amount: 0 }) as KasbonDeductionResult
+  },
+
   /** Summary payroll untuk dashboard */
   async getPayrollSummary(): Promise<PayrollSummary[]> {
     const { data, error } = await supabase
@@ -456,5 +356,80 @@ export const hrService = {
       total_deduction: Number(r.total_deduction) || 0,
       total_net: Number(r.total_net) || 0,
     }))
+  },
+
+  // ============================================================
+  // EMPLOYEE LOANS (KASBON)
+  // ============================================================
+
+  async fetchEmployeeLoans(): Promise<EmployeeLoan[]> {
+    const { data, error } = await supabase
+      .from('employee_loans')
+      .select('*, employee:employees(id, name, employee_code, position), payments:employee_loan_payments(*)')
+      .order('loan_date', { ascending: false })
+    if (error) throw error
+    return (data || []) as EmployeeLoan[]
+  },
+
+  async getEmployeeLoan(id: string): Promise<EmployeeLoan | null> {
+    const { data, error } = await supabase
+      .from('employee_loans')
+      .select('*, employee:employees(id, name, employee_code, position), payments:employee_loan_payments(*)')
+      .eq('id', id)
+      .single()
+    if (error) throw error
+    return data as EmployeeLoan
+  },
+
+  async createEmployeeLoan(input: EmployeeLoanInsert): Promise<EmployeeLoan> {
+    // remaining_amount selalu disamakan dengan amount saat awal (lunas dicicil via payment)
+    const { data, error } = await supabase
+      .from('employee_loans')
+      .insert({ ...input, remaining_amount: input.amount })
+      .select('*, employee:employees(id, name, employee_code, position)')
+      .single()
+    if (error) throw error
+    return data as EmployeeLoan
+  },
+
+  async updateEmployeeLoan(id: string, updates: EmployeeLoanUpdate): Promise<EmployeeLoan> {
+    const payload: Record<string, any> = { ...updates, updated_at: new Date().toISOString() }
+    // amount diubah → sisa ikut digeser agar selisih pembayaran tetap valid
+    if (updates.amount !== undefined && updates.remaining_amount === undefined) {
+      const existing = await this.getEmployeeLoan(id)
+      if (existing) {
+        const paid = Number(existing.amount) - Number(existing.remaining_amount)
+        payload.remaining_amount = Math.max(0, Number(updates.amount) - paid)
+        if (payload.status === undefined) {
+          payload.status = payload.remaining_amount <= 0 ? 'paid' : 'active'
+        }
+      }
+    }
+    const { data, error } = await supabase
+      .from('employee_loans')
+      .update(payload)
+      .eq('id', id)
+      .select('*, employee:employees(id, name, employee_code, position)')
+      .single()
+    if (error) throw error
+    return data as EmployeeLoan
+  },
+
+  async deleteEmployeeLoan(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('employee_loans')
+      .delete()
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  async createLoanPayment(input: EmployeeLoanPaymentInsert): Promise<EmployeeLoanPayment> {
+    const { data, error } = await supabase
+      .from('employee_loan_payments')
+      .insert(input)
+      .select()
+      .single()
+    if (error) throw error
+    return data as EmployeeLoanPayment
   },
 }

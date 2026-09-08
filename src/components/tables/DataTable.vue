@@ -67,21 +67,14 @@
         </div>
 
         <!-- Category Filter -->
-        <div v-if="categoryOptions.length > 0" class="relative w-72">
-          <select
+        <div v-if="categoryOptions.length > 0" class="w-72">
+          <SelectField
             v-model="selectedCategory"
+            :options="categoryOptions"
+            title="Kategori"
+            button-class="flex h-10 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             @change="$emit('category-change', selectedCategory)"
-            class="h-10 w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-          >
-            <option v-for="option in categoryOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-          <span class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-700 dark:text-gray-400">
-            <svg class="stroke-current" width="16" height="16" viewBox="0 0 20 20" fill="none">
-              <path d="M4.79175 7.396L10.0001 12.6043L15.2084 7.396" stroke="" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </span>
+          />
         </div>
 
         <!-- Status Filter Buttons -->
@@ -234,15 +227,17 @@
       >
         <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
           <span>Tampilkan:</span>
-          <select
+          <SelectField
             v-model="itemsPerPage"
+            :options="[
+              { label: '10', value: 10 },
+              { label: '25', value: 25 },
+              { label: '50', value: 50 },
+            ]"
+            title="Tampilkan Per Halaman"
+            button-class="flex w-[72px] items-center justify-between rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             @change="changeItemsPerPage(itemsPerPage)"
-            class="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-          >
-            <option :value="10">10</option>
-            <option :value="25">25</option>
-            <option :value="50">50</option>
-          </select>
+          />
           <span>
             Menampilkan {{ startIndex + 1 }} - {{ Math.min(endIndex, filteredData.length) }} dari
             {{ filteredData.length }} data
@@ -431,15 +426,17 @@
       >
         <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
           <span>Tampilkan:</span>
-          <select
+          <SelectField
             v-model="itemsPerPage"
+            :options="[
+              { label: '10', value: 10 },
+              { label: '25', value: 25 },
+              { label: '50', value: 50 },
+            ]"
+            title="Tampilkan Per Halaman"
+            button-class="flex w-[72px] items-center justify-between rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             @change="changeItemsPerPage(itemsPerPage)"
-            class="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-          >
-            <option :value="10">10</option>
-            <option :value="25">25</option>
-            <option :value="50">50</option>
-          </select>
+          />
           <span class="hidden sm:inline">
             Menampilkan {{ startIndex + 1 }} - {{ Math.min(endIndex, filteredData.length) }} dari
             {{ filteredData.length }} data
@@ -495,6 +492,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import FilterModal from '@/components/common/FilterModal.vue'
+import SelectField from '@/components/common/SelectField.vue'
 
 const emit = defineEmits(['menu-action', 'add-click', 'filter-click', 'import-click', 'export-click', 'category-change', 'status-filter-change', 'apply-filter'])
 

@@ -152,24 +152,6 @@ export const useFinanceStore = defineStore('finance', () => {
     }
   }
 
-  async function voidJournal(id: string) {
-    loading.value = true
-    error.value = null
-
-    const index = journals.value.findIndex((j) => j.id === id)
-    const oldJournal = index !== -1 ? { ...journals.value[index] } : null
-
-    try {
-      await financeServiceAdapter.voidJournal(id)
-      if (index !== -1) journals.value[index].status = 'void'
-    } catch (e: any) {
-      if (oldJournal && index !== -1) journals.value[index] = oldJournal
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
 
   async function deleteJournal(id: string) {
     loading.value = true
@@ -253,7 +235,6 @@ export const useFinanceStore = defineStore('finance', () => {
     fetchJournals,
     getJournal,
     createJournal,
-    voidJournal,
     deleteJournal,
     getAccountBalances,
     getLedger,

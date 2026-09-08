@@ -12,30 +12,37 @@
         <div class="space-y-3">
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Purchase Order (opsional)</label>
-            <select
+            <SelectField
               v-model="selectedPOId"
+              :options="[
+                { label: 'PO Baru (tanpa referensi)', value: null },
+                ...openPOs.map((po) => ({ label: `${po.po_number} — ${po.supplier_name}`, value: po.id }))
+              ]"
+              title="Pilih Purchase Order"
+              placeholder="PO Baru (tanpa referensi)"
+              searchable
+              search-placeholder="Cari PO..."
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               @change="onPOSelect"
-              class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-            >
-              <option :value="null">PO Baru (tanpa referensi)</option>
-              <option v-for="po in openPOs" :key="po.id" :value="po.id">{{ po.po_number }} — {{ po.supplier_name }}</option>
-            </select>
+            />
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Supplier *</label>
-              <select
+              <SelectField
                 v-model="form.supplier_id"
+                :options="store.suppliers.map((s) => ({ label: s.name, value: s.id }))"
+                title="Pilih Supplier"
+                placeholder="Pilih supplier..."
+                searchable
+                search-placeholder="Cari supplier..."
                 :disabled="!!selectedPOId"
-                class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm disabled:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-900"
-              >
-                <option :value="null">Pilih supplier...</option>
-                <option v-for="s in store.suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
-              </select>
+                button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 disabled:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-900"
+              />
             </div>
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tanggal Terima *</label>
-              <input v-model="form.receipt_date" type="date" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+              <DateField v-model="form.receipt_date" title="Tanggal Terima" button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
             </div>
           </div>
         </div>
@@ -127,6 +134,8 @@ import AdminLayout from '@/components/layout/AdminLayout.vue'
 import CurrencyInput from '@/components/common/CurrencyInput.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DateField from '@/components/common/DateField.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { usePurchasingStore } from '@/stores/purchasing'
 import type { GRNItemInput, GoodsReceiptInput } from '@/types/database'
 

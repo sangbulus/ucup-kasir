@@ -276,13 +276,15 @@
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                   Urutan Waktu
                 </label>
-                <select
+                <SelectField
                   v-model="filters.sortOrder"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-brand-500"
-                >
-                  <option value="newest">Terbaru</option>
-                  <option value="oldest">Terlama</option>
-                </select>
+                  :options="[
+                    { label: 'Terbaru', value: 'newest' },
+                    { label: 'Terlama', value: 'oldest' },
+                  ]"
+                  title="Urutan Waktu"
+                  button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-brand-500"
+                />
               </div>
 
               <!-- Status Pembayaran -->
@@ -290,14 +292,16 @@
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                   Status Pembayaran
                 </label>
-                <select
+                <SelectField
                   v-model="filters.paymentStatus"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-brand-500"
-                >
-                  <option value="all">Semua Status</option>
-                  <option value="lunas">Lunas</option>
-                  <option value="belum_lunas">Belum Lunas</option>
-                </select>
+                  :options="[
+                    { label: 'Semua Status', value: 'all' },
+                    { label: 'Lunas', value: 'lunas' },
+                    { label: 'Belum Lunas', value: 'belum_lunas' },
+                  ]"
+                  title="Status Pembayaran"
+                  button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-brand-500"
+                />
               </div>
 
               <!-- Metode Pembayaran -->
@@ -305,16 +309,18 @@
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                   Metode Pembayaran
                 </label>
-                <select
+                <SelectField
                   v-model="filters.paymentMethod"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-brand-500"
-                >
-                  <option value="all">Semua Metode</option>
-                  <option value="cash">Cash</option>
-                  <option value="transfer">Transfer</option>
-                  <option value="qris">QRIS</option>
-                  <option value="tempo">Tempo</option>
-                </select>
+                  :options="[
+                    { label: 'Semua Metode', value: 'all' },
+                    { label: 'Cash', value: 'cash' },
+                    { label: 'Transfer', value: 'transfer' },
+                    { label: 'QRIS', value: 'qris' },
+                    { label: 'Tempo', value: 'tempo' },
+                  ]"
+                  title="Metode Pembayaran"
+                  button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-brand-500"
+                />
               </div>
 
               <!-- Tanggal Dari -->
@@ -322,10 +328,10 @@
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                   Dari Tanggal
                 </label>
-                <input
-                  type="date"
+                <DateField
                   v-model="filters.dateFrom"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-brand-500"
+                  title="Dari Tanggal"
+                  button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-brand-500"
                 />
               </div>
 
@@ -334,10 +340,10 @@
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                   Sampai Tanggal
                 </label>
-                <input
-                  type="date"
+                <DateField
                   v-model="filters.dateTo"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-brand-500"
+                  title="Sampai Tanggal"
+                  button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-brand-500"
                 />
               </div>
 
@@ -549,13 +555,15 @@
                   <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Urutan Waktu
                   </label>
-                  <select
+                  <SelectField
                     v-model="filters.sortOrder"
-                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  >
-                    <option value="newest">Terbaru</option>
-                    <option value="oldest">Terlama</option>
-                  </select>
+                    :options="[
+                      { label: 'Terbaru', value: 'newest' },
+                      { label: 'Terlama', value: 'oldest' },
+                    ]"
+                    title="Urutan Waktu"
+                    button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
                 </div>
 
                 <!-- Status Pembayaran -->
@@ -563,14 +571,16 @@
                   <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Status Pembayaran
                   </label>
-                  <select
+                  <SelectField
                     v-model="filters.paymentStatus"
-                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  >
-                    <option value="all">Semua Status</option>
-                    <option value="lunas">Lunas</option>
-                    <option value="belum_lunas">Belum Lunas</option>
-                  </select>
+                    :options="[
+                      { label: 'Semua Status', value: 'all' },
+                      { label: 'Lunas', value: 'lunas' },
+                      { label: 'Belum Lunas', value: 'belum_lunas' },
+                    ]"
+                    title="Status Pembayaran"
+                    button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
                 </div>
 
                 <!-- Metode Pembayaran -->
@@ -578,16 +588,18 @@
                   <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Metode Pembayaran
                   </label>
-                  <select
+                  <SelectField
                     v-model="filters.paymentMethod"
-                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  >
-                    <option value="all">Semua Metode</option>
-                    <option value="cash">Cash</option>
-                    <option value="transfer">Transfer</option>
-                    <option value="qris">QRIS</option>
-                    <option value="tempo">Tempo</option>
-                  </select>
+                    :options="[
+                      { label: 'Semua Metode', value: 'all' },
+                      { label: 'Cash', value: 'cash' },
+                      { label: 'Transfer', value: 'transfer' },
+                      { label: 'QRIS', value: 'qris' },
+                      { label: 'Tempo', value: 'tempo' },
+                    ]"
+                    title="Metode Pembayaran"
+                    button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
                 </div>
 
                 <!-- Tanggal Dari -->
@@ -595,10 +607,10 @@
                   <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Dari Tanggal
                   </label>
-                  <input
-                    type="date"
+                  <DateField
                     v-model="filters.dateFrom"
-                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    title="Dari Tanggal"
+                    button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -607,10 +619,10 @@
                   <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Sampai Tanggal
                   </label>
-                  <input
-                    type="date"
+                  <DateField
                     v-model="filters.dateTo"
-                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    title="Sampai Tanggal"
+                    button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
 
@@ -688,6 +700,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import CurrencyInput from '@/components/common/CurrencyInput.vue'
+import DateField from '@/components/common/DateField.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import ComponentCard from '@/components/common/ComponentCard.vue'

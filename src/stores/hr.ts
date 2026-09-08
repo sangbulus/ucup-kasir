@@ -2,12 +2,6 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { hrServiceAdapter } from '@/services'
 import type {
-  Department,
-  DepartmentInsert,
-  DepartmentUpdate,
-  Position,
-  PositionInsert,
-  PositionUpdate,
   Employee,
   EmployeeInsert,
   EmployeeUpdate,
@@ -23,13 +17,21 @@ import type {
   PayrollPeriodUpdate,
   Payroll,
   PayrollSummary,
+  EmployeeLoan,
+  EmployeeLoanInsert,
+  EmployeeLoanUpdate,
+  EmployeeLoanPayment,
+  EmployeeLoanPaymentInsert,
+  KasbonChoice,
+  KasbonDeductionResult,
 } from '@/types/database'
 
 // ============================================================
 // Store: HR & Payroll — Manajemen Karyawan
-// - Master: Departemen, Jabatan, Karyawan
+// - Master: Karyawan (jabatan = teks 'supir' | 'loader')
 // - Absensi
 // - Komponen Payroll
+// - Kasbon (employee_loans)
 // - Periode Payroll & Slip Gaji
 // ============================================================
 
@@ -37,8 +39,6 @@ export const useHrStore = defineStore('hr', () => {
   // ============================================================
   // State
   // ============================================================
-  const departments = ref<Department[]>([])
-  const positions = ref<Position[]>([])
   const employees = ref<Employee[]>([])
   const employeesWithStats = ref<EmployeeWithStats[]>([])
   const attendance = ref<Attendance[]>([])
@@ -46,144 +46,9 @@ export const useHrStore = defineStore('hr', () => {
   const payrollPeriods = ref<PayrollPeriod[]>([])
   const payrolls = ref<Payroll[]>([])
   const payrollSummary = ref<PayrollSummary[]>([])
+  const employeeLoans = ref<EmployeeLoan[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
-
-  // ============================================================
-  // DEPARTMENTS
-  // ============================================================
-
-  async function fetchDepartments() {
-    loading.value = true
-    error.value = null
-    try {
-      departments.value = await hrServiceAdapter.fetchDepartments()
-      return departments.value
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function createDepartment(input: DepartmentInsert) {
-    loading.value = true
-    error.value = null
-    try {
-      const created = await hrServiceAdapter.createDepartment(input)
-      departments.value.push(created)
-      return created
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function updateDepartment(id: string, updates: DepartmentUpdate) {
-    loading.value = true
-    error.value = null
-    const index = departments.value.findIndex((d) => d.id === id)
-    const old = index !== -1 ? { ...departments.value[index] } : null
-    try {
-      const updated = await hrServiceAdapter.updateDepartment(id, updates)
-      if (index !== -1) departments.value[index] = updated
-      return updated
-    } catch (e: any) {
-      if (old && index !== -1) departments.value[index] = old
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function deleteDepartment(id: string) {
-    loading.value = true
-    error.value = null
-    const index = departments.value.findIndex((d) => d.id === id)
-    const old = index !== -1 ? { ...departments.value[index] } : null
-    try {
-      await hrServiceAdapter.deleteDepartment(id)
-      departments.value = departments.value.filter((d) => d.id !== id)
-    } catch (e: any) {
-      if (old && index !== -1) departments.value[index] = old
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // ============================================================
-  // POSITIONS
-  // ============================================================
-
-  async function fetchPositions() {
-    loading.value = true
-    error.value = null
-    try {
-      positions.value = await hrServiceAdapter.fetchPositionsWithDepartment()
-      return positions.value
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function createPosition(input: PositionInsert) {
-    loading.value = true
-    error.value = null
-    try {
-      const created = await hrServiceAdapter.createPosition(input)
-      positions.value.push(created)
-      return created
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function updatePosition(id: string, updates: PositionUpdate) {
-    loading.value = true
-    error.value = null
-    const index = positions.value.findIndex((p) => p.id === id)
-    const old = index !== -1 ? { ...positions.value[index] } : null
-    try {
-      const updated = await hrServiceAdapter.updatePosition(id, updates)
-      if (index !== -1) positions.value[index] = updated
-      return updated
-    } catch (e: any) {
-      if (old && index !== -1) positions.value[index] = old
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function deletePosition(id: string) {
-    loading.value = true
-    error.value = null
-    const index = positions.value.findIndex((p) => p.id === id)
-    const old = index !== -1 ? { ...positions.value[index] } : null
-    try {
-      await hrServiceAdapter.deletePosition(id)
-      positions.value = positions.value.filter((p) => p.id !== id)
-    } catch (e: any) {
-      if (old && index !== -1) positions.value[index] = old
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
 
   // ============================================================
   // EMPLOYEES
@@ -601,9 +466,127 @@ export const useHrStore = defineStore('hr', () => {
     }
   }
 
+  // ============================================================
+  // EMPLOYEE LOANS (KASBON)
+  // ============================================================
+
+  async function fetchEmployeeLoans() {
+    loading.value = true
+    error.value = null
+    try {
+      employeeLoans.value = await hrServiceAdapter.fetchEmployeeLoans()
+      return employeeLoans.value
+    } catch (e: any) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function getEmployeeLoan(id: string): Promise<EmployeeLoan | null> {
+    loading.value = true
+    error.value = null
+    try {
+      return await hrServiceAdapter.getEmployeeLoan(id)
+    } catch (e: any) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function createEmployeeLoan(input: EmployeeLoanInsert) {
+    loading.value = true
+    error.value = null
+    try {
+      const created = await hrServiceAdapter.createEmployeeLoan(input)
+      employeeLoans.value.unshift(created)
+      return created
+    } catch (e: any) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function updateEmployeeLoan(id: string, updates: EmployeeLoanUpdate) {
+    loading.value = true
+    error.value = null
+    const index = employeeLoans.value.findIndex((l) => l.id === id)
+    const old = index !== -1 ? { ...employeeLoans.value[index] } : null
+    try {
+      const updated = await hrServiceAdapter.updateEmployeeLoan(id, updates)
+      if (index !== -1) employeeLoans.value[index] = updated
+      return updated
+    } catch (e: any) {
+      if (old && index !== -1) employeeLoans.value[index] = old
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function deleteEmployeeLoan(id: string) {
+    loading.value = true
+    error.value = null
+    const index = employeeLoans.value.findIndex((l) => l.id === id)
+    const old = index !== -1 ? { ...employeeLoans.value[index] } : null
+    try {
+      await hrServiceAdapter.deleteEmployeeLoan(id)
+      employeeLoans.value = employeeLoans.value.filter((l) => l.id !== id)
+    } catch (e: any) {
+      if (old && index !== -1) employeeLoans.value[index] = old
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function createLoanPayment(input: EmployeeLoanPaymentInsert) {
+    loading.value = true
+    error.value = null
+    try {
+      const created = await hrServiceAdapter.createLoanPayment(input)
+      // Refresh loan untuk update remaining_amount
+      await fetchEmployeeLoans()
+      return created
+    } catch (e: any) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /** Potong kasbon dari payroll periode yang sudah digenerate (RPC).
+   *  choices: { "<employee_id>": 'all' | 'half' | 'none' | "<nominal>" } */
+  async function applyKasbonDeductions(
+    periodId: string,
+    choices: Record<string, KasbonChoice>
+  ): Promise<KasbonDeductionResult> {
+    loading.value = true
+    error.value = null
+    try {
+      const result = await hrServiceAdapter.applyKasbonDeductions(periodId, choices)
+      // Slip berubah (deduction & net) + sisa kasbon berubah → refresh keduanya
+      payrolls.value = await hrServiceAdapter.fetchPayrolls(periodId)
+      await fetchPayrollPeriods()
+      await fetchEmployeeLoans()
+      return result
+    } catch (e: any) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
-    departments,
-    positions,
     employees,
     employeesWithStats,
     attendance,
@@ -611,16 +594,9 @@ export const useHrStore = defineStore('hr', () => {
     payrollPeriods,
     payrolls,
     payrollSummary,
+    employeeLoans,
     loading,
     error,
-    fetchDepartments,
-    createDepartment,
-    updateDepartment,
-    deleteDepartment,
-    fetchPositions,
-    createPosition,
-    updatePosition,
-    deletePosition,
     fetchEmployees,
     fetchEmployeesWithStats,
     getEmployee,
@@ -647,5 +623,12 @@ export const useHrStore = defineStore('hr', () => {
     generatePayroll,
     postPayrollJournal,
     fetchPayrollSummary,
+    fetchEmployeeLoans,
+    getEmployeeLoan,
+    createEmployeeLoan,
+    updateEmployeeLoan,
+    deleteEmployeeLoan,
+    createLoanPayment,
+    applyKasbonDeductions,
   }
 })

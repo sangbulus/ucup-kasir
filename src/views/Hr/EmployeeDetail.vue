@@ -42,14 +42,13 @@
             </div>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-0 md:grid-cols-3">
+        <div class="grid grid-cols-2 gap-0 md:grid-cols-2">
           <div class="border-b border-gray-200 p-4 md:border-r dark:border-gray-700">
             <p class="text-[10px] text-gray-500 dark:text-gray-400">Jabatan</p>
-            <p class="mt-0.5 text-xs font-medium text-gray-900 dark:text-white">{{ data.position?.name || '-' }}</p>
-          </div>
-          <div class="border-b border-gray-200 p-4 dark:border-gray-700">
-            <p class="text-[10px] text-gray-500 dark:text-gray-400">Departemen</p>
-            <p class="mt-0.5 text-xs font-medium text-gray-900 dark:text-white">{{ (data.position as any)?.department?.name || data.department?.name || '-' }}</p>
+            <p class="mt-0.5 text-xs font-medium text-gray-900 dark:text-white">
+              <span v-if="data.position" class="capitalize">{{ data.position }}</span>
+              <span v-else>-</span>
+            </p>
           </div>
           <div class="border-b border-gray-200 p-4 dark:border-gray-700">
             <p class="text-[10px] text-gray-500 dark:text-gray-400">Tipe Gaji</p>

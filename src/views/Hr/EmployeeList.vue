@@ -29,23 +29,30 @@
           class="w-full rounded-xl border border-gray-300 bg-white py-2.5 pl-10 pr-4 text-xs text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500 dark:focus:border-blue-500"
         />
       </div>
-      <select
-        v-model="filterDepartment"
-        class="rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-      >
-        <option value="">Semua Departemen</option>
-        <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
-      </select>
-      <select
+      <SelectField
+        v-model="filterPosition"
+        :options="[
+          { label: 'Semua Jabatan', value: '' },
+          { label: 'Supir', value: 'supir' },
+          { label: 'Loader', value: 'loader' },
+        ]"
+        title="Pilih Jabatan"
+        placeholder="Semua Jabatan"
+        button-class="flex items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+      />
+      <SelectField
         v-model="filterStatus"
-        class="rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-      >
-        <option value="">Semua Status</option>
-        <option value="aktif">Aktif</option>
-        <option value="cuti">Cuti</option>
-        <option value="nonaktif">Nonaktif</option>
-        <option value="keluar">Keluar</option>
-      </select>
+        :options="[
+          { label: 'Semua Status', value: '' },
+          { label: 'Aktif', value: 'aktif' },
+          { label: 'Cuti', value: 'cuti' },
+          { label: 'Nonaktif', value: 'nonaktif' },
+          { label: 'Keluar', value: 'keluar' },
+        ]"
+        title="Pilih Status"
+        placeholder="Semua Status"
+        button-class="flex items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+      />
       <button
         @click="openAddPage"
         class="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-500"
@@ -94,23 +101,30 @@
               class="w-full rounded-xl border border-gray-300 bg-gray-50 py-2.5 pl-10 pr-4 text-xs text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-500"
             />
           </div>
-          <select
-            v-model="filterDepartment"
-            class="w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          >
-            <option value="">Semua Departemen</option>
-            <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
-          </select>
-          <select
+          <SelectField
+            v-model="filterPosition"
+            :options="[
+              { label: 'Semua Jabatan', value: '' },
+              { label: 'Supir', value: 'supir' },
+              { label: 'Loader', value: 'loader' },
+            ]"
+            title="Pilih Jabatan"
+            placeholder="Semua Jabatan"
+            button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          />
+          <SelectField
             v-model="filterStatus"
-            class="w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          >
-            <option value="">Semua Status</option>
-            <option value="aktif">Aktif</option>
-            <option value="cuti">Cuti</option>
-            <option value="nonaktif">Nonaktif</option>
-            <option value="keluar">Keluar</option>
-          </select>
+            :options="[
+              { label: 'Semua Status', value: '' },
+              { label: 'Aktif', value: 'aktif' },
+              { label: 'Cuti', value: 'cuti' },
+              { label: 'Nonaktif', value: 'nonaktif' },
+              { label: 'Keluar', value: 'keluar' },
+            ]"
+            title="Pilih Status"
+            placeholder="Semua Status"
+            button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          />
         </div>
       </transition>
     </div>
@@ -142,7 +156,6 @@
           <tr class="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
             <th class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Kode</th>
             <th class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Nama</th>
-            <th class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Departemen</th>
             <th class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Jabatan</th>
             <th class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">No. Telepon</th>
             <th class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Status</th>
@@ -158,8 +171,10 @@
           >
             <td class="px-4 py-3 font-mono text-[10px] text-gray-500 dark:text-gray-400">{{ emp.employee_code || '-' }}</td>
             <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ emp.name }}</td>
-            <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ emp.department?.name || (emp.position as any)?.department?.name || '-' }}</td>
-            <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ emp.position?.name || '-' }}</td>
+            <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
+              <span v-if="emp.position" class="capitalize">{{ emp.position }}</span>
+              <span v-else>-</span>
+            </td>
             <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ emp.phone || '-' }}</td>
             <td class="px-4 py-3">
               <span class="rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase" :class="getStatusBadge(emp.status)">
@@ -202,15 +217,16 @@
         <div class="mt-2 flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400">
           <span class="flex items-center gap-1">
             <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            {{ emp.department?.name || (emp.position as any)?.department?.name || '-' }}
-          </span>
-          <span class="flex items-center gap-1">
-            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7a2 2 0 002 2z" />
             </svg>
-            {{ emp.position?.name || '-' }}
+            <span v-if="emp.position" class="capitalize">{{ emp.position }}</span>
+            <span v-else>-</span>
+          </span>
+          <span v-if="emp.phone" class="flex items-center gap-1">
+            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+            </svg>
+            {{ emp.phone }}
           </span>
         </div>
       </div>
@@ -224,23 +240,23 @@ import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useHrStore } from '@/stores/hr'
 
 const router = useRouter()
 const store = useHrStore()
 
 const loading = computed(() => store.loading)
-const departments = computed(() => store.departments)
 
 const searchQuery = ref('')
-const filterDepartment = ref('')
+const filterPosition = ref('')
 const filterStatus = ref('')
 const showMobileFilter = ref(false)
 
 const activeFilterCount = computed(() => {
   let count = 0
   if (searchQuery.value) count++
-  if (filterDepartment.value) count++
+  if (filterPosition.value) count++
   if (filterStatus.value) count++
   return count
 })
@@ -251,11 +267,8 @@ const filteredEmployees = computed(() => {
     const q = searchQuery.value.toLowerCase()
     list = list.filter((e) => e.name.toLowerCase().includes(q) || (e.employee_code || '').toLowerCase().includes(q))
   }
-  if (filterDepartment.value) {
-    list = list.filter((e) => {
-      const deptId = e.department_id || e.position?.department_id
-      return deptId === filterDepartment.value
-    })
+  if (filterPosition.value) {
+    list = list.filter((e) => e.position === filterPosition.value)
   }
   if (filterStatus.value) {
     list = list.filter((e) => e.status === filterStatus.value)
@@ -278,10 +291,6 @@ const getStatusBadge = (status: string) => {
 const openAddPage = () => router.push('/hr/employees/add')
 
 onMounted(async () => {
-  await Promise.all([
-    store.fetchEmployees(),
-    store.fetchDepartments(),
-    store.fetchPositions(),
-  ])
+  await store.fetchEmployees()
 })
 </script>

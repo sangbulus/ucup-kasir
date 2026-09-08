@@ -598,36 +598,8 @@ ALTER TABLE journal_entries DROP CONSTRAINT IF EXISTS journal_entries_check_old;
 -- Modul HR & Payroll — Manajemen Karyawan
 -- ============================================================
 
--- 31) Departemen (Master Divisi)
-CREATE TABLE IF NOT EXISTS departments (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  is_active INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  sync_status TEXT NOT NULL DEFAULT 'synced',
-  updated_at_local TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_departments_user_name ON departments (user_id, name);
-
--- 32) Jabatan (Master Posisi + gaji pokok)
-CREATE TABLE IF NOT EXISTS positions (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  department_id TEXT,
-  name TEXT NOT NULL,
-  base_salary REAL NOT NULL DEFAULT 0,
-  is_active INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  sync_status TEXT NOT NULL DEFAULT 'synced',
-  updated_at_local TEXT,
-  FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL
-);
-CREATE INDEX IF NOT EXISTS idx_positions_user_name ON positions (user_id, name);
-CREATE INDEX IF NOT EXISTS idx_positions_department ON positions (department_id);
+-- (31 & 32 dihapus: master Departemen/Jabatan tidak dipakai lagi —
+--  jabatan kini teks tetap 'supir' | 'loader' di kolom employees.position)
 
 -- 33) Karyawan (Master Pegawai)
 CREATE TABLE IF NOT EXISTS employees (
@@ -643,8 +615,7 @@ CREATE TABLE IF NOT EXISTS employees (
   address TEXT,
   identity_type TEXT,
   identity_number TEXT,
-  department_id TEXT,
-  position_id TEXT,
+  position TEXT CHECK (position IN ('supir', 'loader')),
   join_date TEXT,
   resign_date TEXT,
   status TEXT NOT NULL DEFAULT 'aktif' CHECK (status IN ('aktif', 'cuti', 'nonaktif', 'keluar')),
@@ -659,13 +630,9 @@ CREATE TABLE IF NOT EXISTS employees (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   sync_status TEXT NOT NULL DEFAULT 'synced',
-  updated_at_local TEXT,
-  FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL,
-  FOREIGN KEY (position_id) REFERENCES positions(id) ON DELETE SET NULL
+  updated_at_local TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_employees_user_name ON employees (user_id, name);
-CREATE INDEX IF NOT EXISTS idx_employees_department ON employees (department_id);
-CREATE INDEX IF NOT EXISTS idx_employees_position ON employees (position_id);
 
 -- 34) Absensi Karyawan
 CREATE TABLE IF NOT EXISTS attendance (
@@ -695,14 +662,13 @@ CREATE TABLE IF NOT EXISTS payroll_components (
   amount REAL NOT NULL DEFAULT 0,
   is_percentage INTEGER NOT NULL DEFAULT 0,
   apply_to TEXT NOT NULL DEFAULT 'semua' CHECK (apply_to IN ('semua', 'per_jabatan', 'per_karyawan')),
-  position_id TEXT,
+  position TEXT CHECK (position IN ('supir', 'loader')),
   employee_id TEXT,
   is_active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   sync_status TEXT NOT NULL DEFAULT 'synced',
   updated_at_local TEXT,
-  FOREIGN KEY (position_id) REFERENCES positions(id) ON DELETE CASCADE,
   FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_payroll_components_user ON payroll_components (user_id);
@@ -769,6 +735,44 @@ CREATE TABLE IF NOT EXISTS payroll_items (
   FOREIGN KEY (component_id) REFERENCES payroll_components(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_payroll_items_payroll ON payroll_items (payroll_id);
+
+-- 38b) Kasbon Karyawan (Employee Loans)
+CREATE TABLE IF NOT EXISTS employee_loans (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  employee_id TEXT NOT NULL,
+  loan_date TEXT NOT NULL,
+  amount REAL NOT NULL DEFAULT 0,
+  remaining_amount REAL NOT NULL DEFAULT 0,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paid', 'cancelled')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'synced',
+  updated_at_local TEXT,
+  FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_employee_loans_user ON employee_loans (user_id);
+CREATE INDEX IF NOT EXISTS idx_employee_loans_employee ON employee_loans (employee_id);
+CREATE INDEX IF NOT EXISTS idx_employee_loans_date ON employee_loans (loan_date DESC);
+
+-- 38c) Riwayat Pembayaran/Potongan Kasbon
+CREATE TABLE IF NOT EXISTS employee_loan_payments (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  loan_id TEXT NOT NULL,
+  payroll_id TEXT,
+  payment_date TEXT NOT NULL,
+  amount REAL NOT NULL DEFAULT 0,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'synced',
+  updated_at_local TEXT,
+  FOREIGN KEY (loan_id) REFERENCES employee_loans(id) ON DELETE CASCADE,
+  FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_employee_loan_payments_loan ON employee_loan_payments (loan_id);
+CREATE INDEX IF NOT EXISTS idx_employee_loan_payments_payroll ON employee_loan_payments (payroll_id);
 
 -- ============================================================
 -- Modul Shipping / Pengiriman — Surat Jalan
@@ -911,3 +915,12 @@ DROP INDEX IF EXISTS idx_delivery_orders_trip;
 DROP INDEX IF EXISTS idx_delivery_orders_transaction;
 DROP TABLE IF EXISTS trip_loaders;
 DROP TABLE IF EXISTS trips;
+
+-- ============================================================
+-- MIGRASI DB LAMA: hapus master Departemen/Jabatan
+-- Rebuild employees & payroll_components (buang department_id/
+-- position_id, backfill position TEXT) dilakukan di kode TS
+-- (src/lib/sqlite.ts → migrateSchema) karena butuh urutan aman:
+-- PRAGMA foreign_keys OFF dulu agar DROP tidak cascade ke
+-- attendance/payroll/employee_loans.
+-- ============================================================

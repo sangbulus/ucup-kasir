@@ -66,17 +66,10 @@
           </button>
           <button
             v-if="['draft', 'disiapkan', 'dikirim'].includes(order.status)"
-            @click="changeStatus('batal')"
+            @click="handleDelete"
             class="rounded-xl border border-red-300 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10"
           >
-            Batalkan
-          </button>
-          <button
-            v-if="['batal', 'selesai'].includes(order.status)"
-            @click="changeStatus('draft')"
-            class="rounded-xl border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            Buka Kembali (Draft)
+            Hapus
           </button>
         </div>
       </div>
@@ -96,6 +89,10 @@
           <div>
             <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Kendaraan</p>
             <p class="text-xs font-medium text-gray-900 dark:text-white">{{ order.vehicle?.plate_number || '-' }} <span class="text-gray-400">({{ order.vehicle?.vehicle_type || '' }})</span></p>
+          </div>
+          <div>
+            <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Gaji Sopir</p>
+            <p class="text-xs font-medium text-gray-900 dark:text-white">{{ formatMoney(order.driver_fee || 0) }}</p>
           </div>
           <div>
             <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Alamat</p>
@@ -139,8 +136,8 @@
               <tr class="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-400 dark:border-gray-700">
                 <th class="py-2 pr-2 font-medium">Produk</th>
                 <th class="py-2 px-2 text-right font-medium">Jumlah</th>
-                <th class="py-2 px-2 text-right font-medium">Harga/Unit</th>
-                <th class="py-2 pl-2 text-right font-medium">Subtotal</th>
+                <th class="py-2 px-2 text-right font-medium">Upah/Karung</th>
+                <th class="py-2 pl-2 text-right font-medium">Total Upah</th>
               </tr>
             </thead>
             <tbody>
@@ -279,7 +276,6 @@ const getStatusBadge = (status: string) => {
     case 'disiapkan': return 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
     case 'dikirim': return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
     case 'selesai': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
-    case 'batal': return 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
     default: return 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
   }
 }
@@ -289,7 +285,6 @@ const getDotClass = (status: string) => {
     case 'disiapkan': return 'border-blue-500 text-blue-500'
     case 'dikirim': return 'border-amber-500 text-amber-500'
     case 'selesai': return 'border-emerald-500 text-emerald-500'
-    case 'batal': return 'border-red-500 text-red-500'
     default: return 'border-gray-400 text-gray-400'
   }
 }
@@ -300,7 +295,6 @@ const statusLabel = (s: string) => {
     case 'disiapkan': return 'Disiapkan'
     case 'dikirim': return 'Dikirim'
     case 'selesai': return 'Selesai'
-    case 'batal': return 'Batal'
     default: return s
   }
 }
@@ -319,11 +313,21 @@ const formatDateTime = (d: string) => {
   return date.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-const changeStatus = async (status: 'draft' | 'disiapkan' | 'dikirim' | 'selesai' | 'batal') => {
-  if (status === 'batal' && !(await confirm('Batalkan surat jalan ini?'))) return
+const changeStatus = async (status: 'draft' | 'disiapkan' | 'dikirim' | 'selesai') => {
   try {
     await store.updateDeliveryStatus(doId, status)
     await store.getDeliveryOrder(doId)
+  } catch (e: any) {
+    toast.error('Gagal!', e.message)
+  }
+}
+
+const handleDelete = async () => {
+  if (!(await confirm('Hapus surat jalan ini? Data akan dihapus permanen dan tidak dapat dikembalikan.'))) return
+  try {
+    await store.deleteDeliveryOrder(doId)
+    toast.success('Berhasil!', 'Surat jalan berhasil dihapus')
+    router.push('/shipping/deliveries')
   } catch (e: any) {
     toast.error('Gagal!', e.message)
   }

@@ -5,7 +5,10 @@ export const transactionsService = {
   async getAll(): Promise<Transaction[]> {
     const { data, error } = await supabase
       .from('transactions')
-      .select('*')
+      .select(`
+        *,
+        items:transaction_items(*)
+      `)
       .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -69,13 +72,15 @@ export const transactionsService = {
     if (error) throw error
   },
 
-  async voidTransaction(id: string): Promise<void> {
-    const { error } = await supabase.rpc('void_transaction', {
-      p_transaction_id: id,
-    })
+  async void(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('transactions')
+      .update({ status: 'void' })
+      .eq('id', id)
 
     if (error) throw error
   },
+
 
   async search(query: string): Promise<Transaction[]> {
     const { data, error } = await supabase

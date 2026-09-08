@@ -191,7 +191,7 @@
               </div>
 
               <!-- Jam & Menit -->
-              <div class="grid grid-cols-2 gap-3">
+              <div v-if="showTime" class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Jam
@@ -300,11 +300,14 @@ interface Props {
   value?: string
   /** Judul header modal (default: Tanggal Transaksi) */
   title?: string
+  /** Tampilkan input jam & menit (default: true). Set false untuk pemilih tanggal saja. */
+  showTime?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   value: '',
   title: 'Tanggal Transaksi',
+  showTime: true,
 })
 
 const emit = defineEmits<{
@@ -408,12 +411,20 @@ const selectYear = (y: number) => {
 }
 
 const selectedLabel = computed(() => {
-  return selected.value.toLocaleDateString('id-ID', {
+  if (!props.showTime) {
+    return selected.value.toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+  }
+  return `${selected.value.toLocaleDateString('id-ID', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  })
+  })} • ${String(selectedHour.value).padStart(2, '0')}:${String(selectedMinute.value).padStart(2, '0')}`
 })
 
 const yearOptions = computed(() => {
@@ -484,6 +495,9 @@ const setDatePreset = (preset: 'today' | 'yesterday') => {
 
 const formatDateTimeLocal = (date: Date) => {
   const pad = (n: number) => n.toString().padStart(2, '0')
+  if (!props.showTime) {
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  }
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 

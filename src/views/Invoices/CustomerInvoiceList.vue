@@ -324,41 +324,49 @@
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                 Urutan
               </label>
-              <select
+              <SelectField
                 v-model="filters.sortOrder"
-                class="h-10 w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="newest">Terbaru</option>
-                <option value="oldest">Terlama</option>
-              </select>
+                :options="[
+                  { label: 'Terbaru', value: 'newest' },
+                  { label: 'Terlama', value: 'oldest' },
+                ]"
+                title="Urutan"
+                button-class="flex h-10 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
             </div>
             <div>
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                 Status Pembayaran
               </label>
-              <select
+              <SelectField
                 v-model="filters.paymentStatus"
-                class="h-10 w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="">Semua Status</option>
-                <option value="lunas">Lunas</option>
-                <option value="belum_lunas">Belum Lunas</option>
-              </select>
+                :options="[
+                  { label: 'Semua Status', value: '' },
+                  { label: 'Lunas', value: 'lunas' },
+                  { label: 'Belum Lunas', value: 'belum_lunas' },
+                ]"
+                title="Status Pembayaran"
+                placeholder="Semua Status"
+                button-class="flex h-10 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
             </div>
             <div>
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                 Metode Pembayaran
               </label>
-              <select
+              <SelectField
                 v-model="filters.paymentMethod"
-                class="h-10 w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="">Semua Metode</option>
-                <option value="cash">Cash</option>
-                <option value="transfer">Transfer</option>
-                <option value="qris">QRIS</option>
-                <option value="tempo">Tempo</option>
-              </select>
+                :options="[
+                  { label: 'Semua Metode', value: '' },
+                  { label: 'Cash', value: 'cash' },
+                  { label: 'Transfer', value: 'transfer' },
+                  { label: 'QRIS', value: 'qris' },
+                  { label: 'Tempo', value: 'tempo' },
+                ]"
+                title="Metode Pembayaran"
+                placeholder="Semua Metode"
+                button-class="flex h-10 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
             </div>
             <div class="flex items-end">
               <button
@@ -510,6 +518,7 @@ import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import InvoiceFilterModal from '@/components/common/InvoiceFilterModal.vue'
 import LoadingSkeleton from '@/components/common/LoadingSkeleton.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useCustomersStore } from '@/stores/customers'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useToast } from '@/composables/useToast'

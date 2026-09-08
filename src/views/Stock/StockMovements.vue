@@ -182,42 +182,45 @@
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Produk
             </label>
-            <select
+            <SelectField
               v-model="filters.product_id"
-              class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-white"
-            >
-              <option value="">Semua Produk</option>
-              <option v-for="product in productsStore.products" :key="product.id" :value="product.id">
-                {{ product.name }}
-              </option>
-            </select>
+              :options="[{ label: 'Semua Produk', value: '' }, ...productsStore.products.map((p) => ({ label: p.name, value: p.id }))]"
+              title="Pilih Produk"
+              placeholder="Semua Produk"
+              searchable
+              search-placeholder="Cari produk..."
+              button-class="mt-1 flex w-full items-center justify-between rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-white"
+            />
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Tipe Mutasi
             </label>
-            <select
+            <SelectField
               v-model="filters.movement_type"
-              class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-white"
-            >
-              <option value="">Semua Tipe</option>
-              <option value="in">Masuk</option>
-              <option value="out">Keluar</option>
-              <option value="adjustment">Penyesuaian</option>
-              <option value="opname">Opname</option>
-              <option value="return">Retur</option>
-            </select>
+              :options="[
+                { label: 'Semua Tipe', value: '' },
+                { label: 'Masuk', value: 'in' },
+                { label: 'Keluar', value: 'out' },
+                { label: 'Penyesuaian', value: 'adjustment' },
+                { label: 'Opname', value: 'opname' },
+                { label: 'Retur', value: 'return' },
+              ]"
+              title="Tipe Mutasi"
+              placeholder="Semua Tipe"
+              button-class="mt-1 flex w-full items-center justify-between rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-white"
+            />
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Dari Tanggal
             </label>
-            <input
+            <DateField
               v-model="filters.start_date"
-              type="date"
-              class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-white"
+              title="Dari Tanggal"
+              button-class="mt-1 flex w-full items-center justify-between rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-white"
             />
           </div>
 
@@ -225,10 +228,10 @@
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Sampai Tanggal
             </label>
-            <input
+            <DateField
               v-model="filters.end_date"
-              type="date"
-              class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-white"
+              title="Sampai Tanggal"
+              button-class="mt-1 flex w-full items-center justify-between rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-white"
             />
           </div>
         </div>
@@ -420,6 +423,8 @@ import DataTable from '@/components/tables/DataTable.vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DateField from '@/components/common/DateField.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useProductsStore } from '@/stores/products'
 import { useStockStore } from '@/stores/stock'
 import { useToast } from '@/composables/useToast'

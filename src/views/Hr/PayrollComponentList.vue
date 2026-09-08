@@ -31,17 +31,27 @@
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tipe <span class="text-red-500">*</span></label>
-            <select v-model="formComp.type" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="tunjangan">Tunjangan</option>
-              <option value="potongan">Potongan</option>
-            </select>
+            <SelectField
+              v-model="formComp.type"
+              :options="[
+                { label: 'Tunjangan', value: 'tunjangan' },
+                { label: 'Potongan', value: 'potongan' },
+              ]"
+              title="Tipe Komponen"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tipe Nilai</label>
-            <select v-model="formComp.is_percentage" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option :value="false">Nominal (Rp)</option>
-              <option :value="true">Persentase (%)</option>
-            </select>
+            <SelectField
+              v-model="formComp.is_percentage"
+              :options="[
+                { label: 'Nominal (Rp)', value: false },
+                { label: 'Persentase (%)', value: true },
+              ]"
+              title="Tipe Nilai"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Nilai <span class="text-red-500">*</span></label>
@@ -49,25 +59,41 @@
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Berlaku Untuk</label>
-            <select v-model="formComp.apply_to" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="semua">Semua Karyawan</option>
-              <option value="per_jabatan">Per Jabatan</option>
-              <option value="per_karyawan">Per Karyawan</option>
-            </select>
+            <SelectField
+              v-model="formComp.apply_to"
+              :options="[
+                { label: 'Semua Karyawan', value: 'semua' },
+                { label: 'Per Jabatan', value: 'per_jabatan' },
+                { label: 'Per Karyawan', value: 'per_karyawan' },
+              ]"
+              title="Berlaku Untuk"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div v-if="formComp.apply_to === 'per_jabatan'">
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Jabatan</label>
-            <select v-model="formComp.position_id" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="">- Pilih -</option>
-              <option v-for="p in store.positions" :key="p.id" :value="p.id">{{ p.name }}</option>
-            </select>
+            <SelectField
+              v-model="formComp.position"
+              :options="[
+                { label: 'Supir', value: 'supir' },
+                { label: 'Loader', value: 'loader' },
+              ]"
+              title="Pilih Jabatan"
+              placeholder="- Pilih -"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div v-if="formComp.apply_to === 'per_karyawan'">
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Karyawan</label>
-            <select v-model="formComp.employee_id" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="">- Pilih -</option>
-              <option v-for="e in store.employees" :key="e.id" :value="e.id">{{ e.name }}</option>
-            </select>
+            <SelectField
+              v-model="formComp.employee_id"
+              :options="store.employees.map((e) => ({ label: e.name, value: e.id }))"
+              title="Pilih Karyawan"
+              placeholder="- Pilih -"
+              searchable
+              search-placeholder="Cari karyawan..."
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -153,8 +179,9 @@ import AdminLayout from '@/components/layout/AdminLayout.vue'
 import CurrencyInput from '@/components/common/CurrencyInput.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useHrStore } from '@/stores/hr'
-import type { PayrollComponentInsert } from '@/types/database'
+import type { PayrollComponentInsert, PositionName } from '@/types/database'
 
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -168,7 +195,7 @@ const defaultForm = () => ({
   amount: 0,
   is_percentage: false,
   apply_to: 'semua',
-  position_id: '',
+  position: '',
   employee_id: '',
   is_active: true,
 })
@@ -188,7 +215,7 @@ const editComp = (c: any) => {
   formComp.amount = c.amount
   formComp.is_percentage = c.is_percentage
   formComp.apply_to = c.apply_to
-  formComp.position_id = c.position_id || ''
+  formComp.position = c.position || ''
   formComp.employee_id = c.employee_id || ''
   formComp.is_active = c.is_active
   showForm.value = true
@@ -203,7 +230,7 @@ const formatValue = (c: any) => {
 const applyToLabel = (c: any) => {
   switch (c.apply_to) {
     case 'semua': return 'Semua Karyawan'
-    case 'per_jabatan': return `Jabatan: ${c.position?.name || '-'}`
+    case 'per_jabatan': return c.position ? `Jabatan: ${c.position.charAt(0).toUpperCase() + c.position.slice(1)}` : 'Jabatan: -'
     case 'per_karyawan': return `Karyawan: ${c.employee?.name || '-'}`
     default: return c.apply_to
   }
@@ -211,7 +238,7 @@ const applyToLabel = (c: any) => {
 
 const handleSubmit = async () => {
   if (!formComp.name.trim()) { toast.error('Validasi!', 'Nama komponen wajib diisi'); return }
-  if (formComp.apply_to === 'per_jabatan' && !formComp.position_id) { toast.error('Validasi!', 'Pilih jabatan untuk komponen ini'); return }
+  if (formComp.apply_to === 'per_jabatan' && !formComp.position) { toast.error('Validasi!', 'Pilih jabatan untuk komponen ini'); return }
   if (formComp.apply_to === 'per_karyawan' && !formComp.employee_id) { toast.error('Validasi!', 'Pilih karyawan untuk komponen ini'); return }
   try {
     const payload: PayrollComponentInsert = {
@@ -220,7 +247,7 @@ const handleSubmit = async () => {
       amount: Number(formComp.amount) || 0,
       is_percentage: formComp.is_percentage,
       apply_to: formComp.apply_to as PayrollComponentInsert['apply_to'],
-      position_id: formComp.apply_to === 'per_jabatan' ? formComp.position_id || undefined : undefined,
+      position: formComp.apply_to === 'per_jabatan' ? (formComp.position as PositionName | '' | undefined) : undefined,
       employee_id: formComp.apply_to === 'per_karyawan' ? formComp.employee_id || undefined : undefined,
       is_active: formComp.is_active,
     }
@@ -238,5 +265,5 @@ const handleDelete = async (id: string) => {
   try { await store.deletePayrollComponent(id) } catch (e: any) { toast.error('Gagal!', e.message) }
 }
 
-onMounted(() => Promise.all([store.fetchPayrollComponents(), store.fetchPositions(), store.fetchEmployees()]))
+onMounted(() => Promise.all([store.fetchPayrollComponents(), store.fetchEmployees()]))
 </script>

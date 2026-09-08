@@ -101,10 +101,12 @@ export const useTransactionsStore = defineStore('transactions', () => {
     loading.value = true
     error.value = null
     try {
-      await transactionsServiceAdapter.voidTransaction(id)
-      transactions.value = transactions.value.map((t) =>
-        t.id === id ? { ...t, status: 'batal' } : t
-      )
+      await transactionsServiceAdapter.void(id)
+      const index = transactions.value.findIndex((t) => t.id === id)
+      if (index !== -1) {
+        const updated = await transactionsServiceAdapter.getById(id)
+        if (updated) transactions.value[index] = updated
+      }
     } catch (e: any) {
       error.value = e.message
       throw e
@@ -112,6 +114,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
       loading.value = false
     }
   }
+
 
   async function searchTransactions(query: string) {
     loading.value = true

@@ -235,28 +235,32 @@
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tipe *</label>
-            <select
+            <SelectField
               v-model="form.type"
+              :options="[
+                { label: 'Aset', value: 'aset' },
+                { label: 'Kewajiban', value: 'kewajiban' },
+                { label: 'Ekuitas', value: 'ekuitas' },
+                { label: 'Pendapatan', value: 'pendapatan' },
+                { label: 'Beban', value: 'beban' },
+              ]"
+              title="Tipe Akun"
               :disabled="!!editingId"
-              class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="aset">Aset</option>
-              <option value="kewajiban">Kewajiban</option>
-              <option value="ekuitas">Ekuitas</option>
-              <option value="pendapatan">Pendapatan</option>
-              <option value="beban">Beban</option>
-            </select>
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Saldo Normal *</label>
-            <select
+            <SelectField
               v-model="form.normal_balance"
+              :options="[
+                { label: 'Debit', value: 'debit' },
+                { label: 'Kredit', value: 'kredit' },
+              ]"
+              title="Saldo Normal"
               :disabled="!!editingId"
-              class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="debit">Debit</option>
-              <option value="kredit">Kredit</option>
-            </select>
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div class="flex items-center justify-between">
             <span class="text-xs font-medium text-gray-700 dark:text-gray-300">Akun Aktif</span>
@@ -299,6 +303,7 @@ import { ref, computed, onMounted } from 'vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useFinanceStore } from '@/stores/finance'
 import type { Account, AccountInsert, AccountUpdate } from '@/types/database'
 

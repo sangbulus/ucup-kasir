@@ -356,13 +356,13 @@
 
         <button
           v-if="transaction.status === 'selesai'"
-          @click="showVoidDialog = true"
+          @click="showDeleteDialog = true"
           class="bg-error-500/10 hover:bg-error-500/20 text-error-600 font-semibold py-2 rounded-xl text-[11px] border border-error-500/20 flex items-center justify-center gap-1 active:scale-95 transition dark:text-error-400"
         >
           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
-          Batal TRX
+          Hapus
         </button>
       </div>
     </div>
@@ -629,13 +629,13 @@
             </button>
             <button
               v-if="transaction.status === 'selesai'"
-              @click="showVoidDialog = true"
+              @click="showDeleteDialog = true"
               class="inline-flex items-center justify-center gap-2 rounded-lg border border-error-500 bg-transparent px-4 py-2.5 text-sm font-medium text-error-600 hover:bg-error-50 dark:text-error-500 dark:hover:bg-error-500/15"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
-              Batalkan Transaksi
+              Hapus Transaksi
             </button>
             <button
               @click="router.push(`/transactions/${transaction.id}/invoice`)"
@@ -728,15 +728,15 @@
       @submit="handleReturnSubmit"
     />
 
-    <!-- Void Confirmation Dialog -->
+    <!-- Delete Confirmation Dialog -->
     <ConfirmDialog
-      v-model="showVoidDialog"
-      title="Batalkan Transaksi?"
-      :message="`Apakah Anda yakin ingin membatalkan transaksi '${transaction?.transaction_number}'? Stok produk akan dikembalikan dan transaksi ditandai 'batal'. Riwayat tetap tersimpan.`"
-      confirm-text="Ya, Batalkan"
+      v-model="showDeleteDialog"
+      title="Hapus Transaksi?"
+      :message="`Apakah Anda yakin ingin menghapus transaksi '${transaction?.transaction_number}'? Stok produk akan dikembalikan dan transaksi akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.`"
+      confirm-text="Ya, Hapus"
       cancel-text="Tutup"
       variant="danger"
-      @confirm="confirmVoid"
+      @confirm="confirmDelete"
     />
 
     <ConfirmDialog
@@ -779,7 +779,7 @@ const { generatePdfBlob, shareToWhatsApp, downloadPdf } = usePdfExport()
 const transactionId = route.params.id as string
 const transaction = ref<any>(null)
 const loading = ref(true)
-const showVoidDialog = ref(false)
+const showDeleteDialog = ref(false)
 const showPaymentModal = ref(false)
 const showReturnModal = ref(false)
 const showDeleteReturnDialog = ref(false)
@@ -990,15 +990,15 @@ const handleAddPayment = async (payload: {
   }
 }
 
-const confirmVoid = async () => {
+const confirmDelete = async () => {
   try {
-    await transactionsStore.voidTransaction(transactionId)
-    toast.success('Berhasil!', 'Transaksi berhasil dibatalkan')
-    transaction.value = await transactionsStore.getTransaction(transactionId)
-    showVoidDialog.value = false
+    await transactionsStore.deleteTransaction(transactionId)
+    toast.success('Berhasil!', 'Transaksi berhasil dihapus')
+    showDeleteDialog.value = false
+    router.push('/transactions')
   } catch (error: any) {
-    console.error('Error voiding transaction:', error)
-    toast.error('Gagal!', 'Gagal membatalkan transaksi')
+    console.error('Error deleting transaction:', error)
+    toast.error('Gagal!', 'Gagal menghapus transaksi')
   }
 }
 

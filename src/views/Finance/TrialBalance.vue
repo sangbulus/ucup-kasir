@@ -160,10 +160,10 @@
         <div class="space-y-4">
           <div>
             <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">Sampai Tanggal</label>
-            <input
-              type="date"
+            <DateField
               v-model="tempEnd"
-              class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              title="Sampai Tanggal"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
           </div>
 
@@ -193,6 +193,7 @@ import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DateField from '@/components/common/DateField.vue'
 import { useFinanceStore } from '@/stores/finance'
 import type { AccountBalance } from '@/types/database'
 

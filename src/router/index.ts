@@ -624,22 +624,16 @@ const router = createRouter({
       meta: { title: 'Edit Karyawan' },
     },
     {
-      path: '/hr/departments',
-      name: 'Department List',
-      component: () => import('../views/Hr/DepartmentList.vue'),
-      meta: { title: 'Departemen' },
-    },
-    {
-      path: '/hr/positions',
-      name: 'Position List',
-      component: () => import('../views/Hr/PositionList.vue'),
-      meta: { title: 'Jabatan' },
-    },
-    {
       path: '/hr/attendance',
       name: 'Attendance List',
       component: () => import('../views/Hr/AttendanceList.vue'),
       meta: { title: 'Absensi' },
+    },
+    {
+      path: '/hr/loans',
+      name: 'Employee Loan List',
+      component: () => import('../views/Hr/EmployeeLoanList.vue'),
+      meta: { title: 'Kasbon Karyawan' },
     },
     {
       path: '/hr/payroll',
@@ -680,6 +674,12 @@ const router = createRouter({
       name: 'Delivery Order List',
       component: () => import('../views/Shipping/DeliveryOrderList.vue'),
       meta: { title: 'Surat Jalan' },
+    },
+    {
+      path: '/shipping/pending-shipments',
+      name: 'Pending Shipment List',
+      component: () => import('../views/Shipping/PendingShipmentList.vue'),
+      meta: { title: 'Transaksi Belum Dikirim' },
     },
     {
       path: '/shipping/deliveries/add',

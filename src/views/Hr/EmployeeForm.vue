@@ -27,15 +27,21 @@
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Jenis Kelamin</label>
-            <select v-model="form.gender" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="">- Pilih -</option>
-              <option value="laki_laki">Laki-laki</option>
-              <option value="perempuan">Perempuan</option>
-            </select>
+            <SelectField
+              v-model="form.gender"
+              :options="[
+                { label: '- Pilih -', value: '' },
+                { label: 'Laki-laki', value: 'laki_laki' },
+                { label: 'Perempuan', value: 'perempuan' },
+              ]"
+              title="Jenis Kelamin"
+              placeholder="- Pilih -"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tanggal Lahir</label>
-            <input v-model="form.birth_date" type="date" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+            <DateField v-model="form.birth_date" title="Tanggal Lahir" button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tempat Lahir</label>
@@ -55,12 +61,18 @@
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Jenis Identitas</label>
-            <select v-model="form.identity_type" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="">- Pilih -</option>
-              <option value="ktp">KTP</option>
-              <option value="sim">SIM</option>
-              <option value="passport">Paspor</option>
-            </select>
+            <SelectField
+              v-model="form.identity_type"
+              :options="[
+                { label: '- Pilih -', value: '' },
+                { label: 'KTP', value: 'ktp' },
+                { label: 'SIM', value: 'sim' },
+                { label: 'Paspor', value: 'passport' },
+              ]"
+              title="Jenis Identitas"
+              placeholder="- Pilih -"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Nomor Identitas</label>
@@ -74,43 +86,53 @@
         <h3 class="mb-3 text-sm font-bold text-gray-900 dark:text-white">Data Pekerjaan</h3>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Departemen</label>
-            <select v-model="form.department_id" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="">- Pilih -</option>
-              <option v-for="d in store.departments" :key="d.id" :value="d.id">{{ d.name }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Jabatan</label>
-            <select v-model="form.position_id" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="">- Pilih -</option>
-              <option v-for="p in filteredPositions" :key="p.id" :value="p.id">{{ p.name }}</option>
-            </select>
+            <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Jabatan <span class="text-red-500">*</span></label>
+            <SelectField
+              v-model="form.position"
+              :options="[
+                { label: '- Pilih Jabatan -', value: '' },
+                { label: 'Supir', value: 'supir' },
+                { label: 'Loader', value: 'loader' },
+              ]"
+              title="Pilih Jabatan"
+              placeholder="- Pilih Jabatan -"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tanggal Bergabung</label>
-            <input v-model="form.join_date" type="date" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+            <DateField v-model="form.join_date" title="Tanggal Bergabung" button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Status Karyawan</label>
-            <select v-model="form.status" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="aktif">Aktif</option>
-              <option value="cuti">Cuti</option>
-              <option value="nonaktif">Nonaktif</option>
-              <option value="keluar">Keluar</option>
-            </select>
+            <SelectField
+              v-model="form.status"
+              :options="[
+                { label: 'Aktif', value: 'aktif' },
+                { label: 'Cuti', value: 'cuti' },
+                { label: 'Nonaktif', value: 'nonaktif' },
+                { label: 'Keluar', value: 'keluar' },
+              ]"
+              title="Status Karyawan"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tipe Gaji</label>
-            <select v-model="form.salary_type" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="bulanan">Bulanan</option>
-              <option value="harian">Harian</option>
-              <option value="mingguan">Mingguan</option>
-            </select>
+            <SelectField
+              v-model="form.salary_type"
+              :options="[
+                { label: 'Bulanan', value: 'bulanan' },
+                { label: 'Harian', value: 'harian' },
+                { label: 'Mingguan', value: 'mingguan' },
+              ]"
+              title="Tipe Gaji"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div v-if="isEdit" class="sm:col-span-2">
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tanggal Keluar</label>
-            <input v-model="form.resign_date" type="date" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+            <DateField v-model="form.resign_date" title="Tanggal Keluar" button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
           </div>
         </div>
       </div>
@@ -179,6 +201,8 @@ import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DateField from '@/components/common/DateField.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useHrStore } from '@/stores/hr'
 
 const route = useRoute()
@@ -199,8 +223,7 @@ const form = reactive({
   address: '',
   identity_type: '',
   identity_number: '',
-  department_id: '',
-  position_id: '',
+  position: '',
   join_date: '',
   resign_date: '',
   status: 'aktif',
@@ -212,11 +235,6 @@ const form = reactive({
   npwp: '',
   notes: '',
   is_active: true,
-})
-
-const filteredPositions = computed(() => {
-  if (!form.department_id) return store.positions
-  return store.positions.filter((p) => !p.department_id || p.department_id === form.department_id)
 })
 
 const loadForm = async () => {
@@ -237,8 +255,7 @@ const loadForm = async () => {
     form.address = emp.address || ''
     form.identity_type = emp.identity_type || ''
     form.identity_number = emp.identity_number || ''
-    form.department_id = emp.department_id || ''
-    form.position_id = emp.position_id || ''
+    form.position = emp.position || ''
     form.join_date = emp.join_date || ''
     form.resign_date = emp.resign_date || ''
     form.status = emp.status
@@ -273,8 +290,7 @@ const handleSubmit = async () => {
     address: form.address || null,
     identity_type: form.identity_type || null,
     identity_number: form.identity_number || null,
-    department_id: form.department_id || null,
-    position_id: form.position_id || null,
+    position: form.position || null,
     join_date: form.join_date || null,
     resign_date: form.resign_date || null,
     status: form.status,
@@ -301,7 +317,6 @@ const handleSubmit = async () => {
 }
 
 onMounted(async () => {
-  await Promise.all([store.fetchDepartments(), store.fetchPositions()])
   await loadForm()
 })
 </script>

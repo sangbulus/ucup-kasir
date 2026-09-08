@@ -8,8 +8,7 @@ import type { Transaction, TransactionInput, TransactionItem, TransactionPayment
 // Mirror dari src/services/transactions.ts + replikasi fungsi RPC:
 //   - create_transaction (atomik: validasi stok, simpan transaksi+items, kurangi stok, catat pembayaran)
 //   - add_transaction_payment (atomik: catat pembayaran, update status)
-//   - delete_transaction (atomik: kembalikan stok, hapus)
-//   - void_transaction (atomik: kembalikan stok, set status=batal)
+//   - delete_transaction (atomik: kembalikan stok, hapus permanen)
 // Plus replikasi trigger: record_stock_movement, create_transaction_notification, create_payment_notification
 // ============================================================
 
@@ -26,7 +25,17 @@ export const sqliteTransactionsService = {
        ORDER BY created_at DESC`,
       [userId]
     )
-    return rows.map((r) => this.mapRow(r))
+
+    // Load items untuk setiap transaksi
+    const transactions = await Promise.all(
+      rows.map(async (r) => {
+        const txn = this.mapRow(r)
+        txn.items = await this.getItems(txn.id)
+        return txn
+      })
+    )
+
+    return transactions
   },
 
   async getById(id: string): Promise<Transaction | null> {
@@ -476,87 +485,22 @@ export const sqliteTransactionsService = {
     }
   },
 
-  /**
-   * Replikasi fungsi RPC void_transaction:
-   * 1. Validasi status (bukan batal)
-   * 2. Kembalikan stok produk
-   * 3. Set status = 'batal' (data tetap tersimpan)
-   */
-  async voidTransaction(id: string): Promise<void> {
+  async void(id: string): Promise<void> {
     const userId = getCurrentUserId()
     const now = nowIso()
-    let autoJournalId: string | null = null
 
     await transaction(async (tx) => {
-      const txnRows = await tx.query<any>(
-        `SELECT status, transaction_number, total, paid_amount, remaining_amount FROM transactions WHERE id = ? AND user_id = ?`,
-        [id, userId]
-      )
-      const txn = txnRows[0]
-      if (!txn) throw new Error('Transaksi tidak ditemukan')
-      if (txn.status === 'batal') throw new Error('Transaksi sudah dibatalkan sebelumnya')
-
-      const items = await tx.query<any>(
-        `SELECT ti.product_id, ti.quantity, COALESCE(p.price_buy, 0) AS price_buy
-         FROM transaction_items ti
-         LEFT JOIN products p ON p.id = ti.product_id
-         WHERE ti.transaction_id = ? AND ti.user_id = ?`,
-        [id, userId]
-      )
-
-      let totalCogs = 0
-      for (const item of items) {
-        totalCogs += item.price_buy * item.quantity
-        if (item.product_id) {
-          const before = await tx.query<any>('SELECT stock FROM products WHERE id = ? AND user_id = ?', [item.product_id, userId])
-          const after = before[0] ? before[0].stock + item.quantity : item.quantity
-          await tx.run(
-            `UPDATE products SET stock = ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
-             WHERE id = ? AND user_id = ?`,
-            [after, now, now, item.product_id, userId]
-          )
-          await tx.run(
-            `INSERT INTO stock_movements (id, user_id, product_id, movement_type, quantity,
-                                          quantity_before, quantity_after, reference_type, reference_id,
-                                          notes, created_at, created_by, sync_status, updated_at_local)
-             VALUES (?, ?, ?, 'in', ?, ?, ?, 'transaction_void', ?, 'Pengembalian stok transaksi batal', ?, ?, 'pending', ?)`,
-            [uuid(), userId, item.product_id, item.quantity, before[0]?.stock ?? 0, after, id, now, userId, now]
-          )
-        }
-      }
-
       await tx.run(
-        `UPDATE transactions SET status = 'batal', updated_at = ?, sync_status = 'pending', updated_at_local = ?
+        `UPDATE transactions SET status = 'void', updated_at = ?, sync_status = 'pending', updated_at_local = ?
          WHERE id = ? AND user_id = ?`,
         [now, now, id, userId]
-      )
-
-      // Void jurnal penjualan terkait
-      await sqliteFinanceService.voidJournalByReference(tx, userId, 'transaction', id, now)
-
-      // Auto-jurnal: jurnal reversal void
-      autoJournalId = await sqliteFinanceService.postVoidJournal(
-        tx,
-        userId,
-        id,
-        txn.transaction_number,
-        txn.total,
-        txn.paid_amount,
-        txn.remaining_amount,
-        totalCogs,
-        now
       )
     })
 
     const txn = await this.getById(id)
     if (txn) await addToSyncQueue('UPDATE', 'transactions', id, txn)
-
-    // Queue jurnal void
-    if (autoJournalId) {
-      const journal = await sqliteFinanceService.getJournal(autoJournalId)
-      await addToSyncQueue('INSERT', 'journal_entries', autoJournalId, journal || { id: autoJournalId })
-    }
   },
+
 
   async search(queryStr: string): Promise<Transaction[]> {
     const userId = getCurrentUserId()

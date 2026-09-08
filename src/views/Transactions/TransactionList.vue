@@ -168,13 +168,13 @@
             </button>
             <button
               v-if="transaction.status === 'selesai'"
-              @click.stop="voidTransaction(transaction)"
+              @click.stop="deleteTransaction(transaction)"
               class="flex flex-1 items-center justify-center gap-1 rounded-lg border border-error-500 bg-transparent py-1.5 text-xs font-medium text-error-600 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/15"
             >
               <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
-              Batalkan
+              Hapus
             </button>
           </div>
         </div>
@@ -335,10 +335,10 @@
               {{ selectedTransactions.length }} dipilih
             </span>
             <button
-              @click="bulkVoid"
+              @click="bulkDelete"
               class="rounded-lg bg-error-500 px-4 py-2 text-sm font-medium text-white hover:bg-error-600"
             >
-              Batalkan
+              Hapus
             </button>
           </div>
         </template>
@@ -467,26 +467,26 @@
       </DataTable>
     </div>
 
-    <!-- Void Confirmation Dialog -->
+    <!-- Delete Confirmation Dialog -->
     <ConfirmDialog
-      v-model="showVoidDialog"
-      title="Batalkan Transaksi?"
-      :message="`Apakah Anda yakin ingin membatalkan transaksi '${transactionToVoid?.transaction_number}'? Stok produk akan dikembalikan dan transaksi ditandai 'batal'. Riwayat tetap tersimpan.`"
-      confirm-text="Ya, Batalkan"
+      v-model="showDeleteDialog"
+      title="Hapus Transaksi?"
+      :message="`Apakah Anda yakin ingin menghapus transaksi '${transactionToDelete?.transaction_number}'? Stok produk akan dikembalikan dan transaksi akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.`"
+      confirm-text="Ya, Hapus"
       cancel-text="Tutup"
       variant="danger"
-      @confirm="confirmVoid"
+      @confirm="confirmDelete"
     />
 
-    <!-- Bulk Void Confirmation Dialog -->
+    <!-- Bulk Delete Confirmation Dialog -->
     <ConfirmDialog
-      v-model="showBulkVoidDialog"
-      title="Batalkan Transaksi Terpilih?"
-      :message="`Apakah Anda yakin ingin membatalkan ${selectedTransactions.length} transaksi terpilih? Stok produk akan dikembalikan dan transaksi ditandai 'batal'. Riwayat tetap tersimpan.`"
-      confirm-text="Ya, Batalkan Semua"
+      v-model="showBulkDeleteDialog"
+      title="Hapus Transaksi Terpilih?"
+      :message="`Apakah Anda yakin ingin menghapus ${selectedTransactions.length} transaksi terpilih? Stok produk akan dikembalikan dan transaksi akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.`"
+      confirm-text="Ya, Hapus Semua"
       cancel-text="Tutup"
       variant="danger"
-      @confirm="confirmBulkVoid"
+      @confirm="confirmBulkDelete"
     />
   </AdminLayout>
 </template>
@@ -502,15 +502,16 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useStoreSettingsStore } from '@/stores/storeSettings'
 import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
 
 const router = useRouter()
 const transactionsStore = useTransactionsStore()
 const settingsStore = useStoreSettingsStore()
 const toast = useToast()
 
-const showVoidDialog = ref(false)
-const showBulkVoidDialog = ref(false)
-const transactionToVoid = ref<any>(null)
+const showDeleteDialog = ref(false)
+const showBulkDeleteDialog = ref(false)
+const transactionToDelete = ref<any>(null)
 const selectedTransactions = ref<string[]>([])
 const selectAllCheckbox = ref<HTMLInputElement | null>(null)
 const expandedCards = ref<string[]>([])
@@ -519,7 +520,7 @@ const perPage = 10
 
 // Pencarian & filter
 const searchQuery = ref('')
-const statusFilter = ref<'semua' | 'selesai' | 'batal'>('semua')
+const statusFilter = ref<'semua' | 'selesai'>('semua')
 const paymentFilter = ref<'semua' | 'lunas' | 'belum_lunas'>('semua')
 
 const filteredTransactions = computed(() => {
@@ -576,7 +577,6 @@ watch([searchQuery, statusFilter, paymentFilter], () => {
 const statusOptions = [
   { value: 'semua', label: 'Semua' },
   { value: 'selesai', label: 'Selesai' },
-  { value: 'batal', label: 'Batal' },
 ] as const
 
 const paymentOptions = [
@@ -683,40 +683,56 @@ const viewTransaction = (transaction: any) => {
   router.push(`/transactions/${transaction.id}`)
 }
 
-const voidTransaction = (transaction: any) => {
-  transactionToVoid.value = transaction
-  showVoidDialog.value = true
+const deleteTransaction = (transaction: any) => {
+  transactionToDelete.value = transaction
+  showDeleteDialog.value = true
 }
 
-const confirmVoid = async () => {
-  if (!transactionToVoid.value) return
+const confirmDelete = async () => {
+  if (!transactionToDelete.value) return
 
   try {
-    await transactionsStore.voidTransaction(transactionToVoid.value.id)
-    toast.success('Berhasil!', 'Transaksi berhasil dibatalkan')
+    await transactionsStore.deleteTransaction(transactionToDelete.value.id)
+    toast.success('Berhasil!', 'Transaksi berhasil dihapus')
   } catch (error) {
-    console.error('Error voiding transaction:', error)
-    toast.error('Gagal!', 'Gagal membatalkan transaksi')
+    console.error('Error deleting transaction:', error)
+    toast.error('Gagal!', 'Gagal menghapus transaksi')
   } finally {
-    transactionToVoid.value = null
+    transactionToDelete.value = null
   }
 }
 
-const bulkVoid = () => {
-  showBulkVoidDialog.value = true
+const bulkDelete = () => {
+  showBulkDeleteDialog.value = true
 }
 
-const confirmBulkVoid = async () => {
+const confirmBulkDelete = async () => {
   const count = selectedTransactions.value.length
   try {
     await Promise.all(
-      selectedTransactions.value.map(id => transactionsStore.voidTransaction(id))
+      selectedTransactions.value.map(id => transactionsStore.deleteTransaction(id))
     )
     selectedTransactions.value = []
-    toast.success('Berhasil!', `${count} transaksi berhasil dibatalkan`)
+    toast.success('Berhasil!', `${count} transaksi berhasil dihapus`)
   } catch (error) {
-    console.error('Error voiding transactions:', error)
-    toast.error('Gagal!', 'Gagal membatalkan beberapa transaksi')
+    console.error('Error deleting transactions:', error)
+    toast.error('Gagal!', 'Gagal menghapus beberapa transaksi')
+  }
+}
+
+const voidTransaction = async (transaction: any) => {
+  const confirmed = await useConfirm().confirm({
+    title: 'Batalkan Transaksi',
+    message: `Apakah Anda yakin ingin membatalkan transaksi ${transaction.transaction_number}? Transaksi akan ditandai sebagai void.`,
+  })
+  if (!confirmed) return
+
+  try {
+    await transactionsStore.voidTransaction(transaction.id)
+    toast.success('Berhasil!', 'Transaksi berhasil dibatalkan')
+  } catch (error: any) {
+    console.error('Error voiding transaction:', error)
+    toast.error('Gagal!', error.message || 'Gagal membatalkan transaksi')
   }
 }
 
@@ -726,7 +742,7 @@ const handleMenuAction = ({ action, row }: { action: string; row: any }) => {
       viewTransaction(row)
       break
     case 'delete':
-      voidTransaction(row)
+      deleteTransaction(row)
       break
   }
 }

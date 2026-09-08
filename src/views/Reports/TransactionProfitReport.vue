@@ -187,34 +187,32 @@
               <!-- Preset -->
               <div>
                 <label class="mb-2 block text-xs font-medium text-gray-700 dark:text-gray-300">Pilih Periode Cepat</label>
-                <select
+                <SelectField
                   v-model="activePreset"
+                  :options="[{ label: 'Custom...', value: '' }, ...presets.map((p) => ({ label: p.label, value: p.value }))]"
+                  title="Pilih Periode Cepat"
+                  placeholder="Custom..."
+                  button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   @change="applyPreset(activePreset)"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="">Custom...</option>
-                  <option v-for="preset in presets" :key="preset.value" :value="preset.value">
-                    {{ preset.label }}
-                  </option>
-                </select>
+                />
               </div>
 
               <!-- Custom Date -->
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="mb-2 block text-xs font-medium text-gray-700 dark:text-gray-300">Dari Tanggal</label>
-                  <input
+                  <DateField
                     v-model="tempStart"
-                    type="date"
-                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    title="Dari Tanggal"
+                    button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
                 <div>
                   <label class="mb-2 block text-xs font-medium text-gray-700 dark:text-gray-300">Sampai Tanggal</label>
-                  <input
+                  <DateField
                     v-model="tempEnd"
-                    type="date"
-                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    title="Sampai Tanggal"
+                    button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   />
                 </div>
               </div>
@@ -260,6 +258,8 @@ import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DateField from '@/components/common/DateField.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useSalesReportEnhancedStore } from '@/stores/salesReportEnhanced'
 
 const router = useRouter()

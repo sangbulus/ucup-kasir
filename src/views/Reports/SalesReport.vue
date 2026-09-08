@@ -36,16 +36,14 @@
                   <label class="mb-2 block text-xs font-medium text-gray-700 dark:text-gray-300">
                     Pilih Periode Cepat
                   </label>
-                  <select
+                  <SelectField
                     v-model="activePreset"
+                    :options="[{ label: 'Custom...', value: '' }, ...reportStore.datePresets.map((p) => ({ label: p.label, value: p.value }))]"
+                    title="Pilih Periode Cepat"
+                    placeholder="Custom..."
+                    button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     @change="reportStore.applyPreset(activePreset)"
-                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  >
-                    <option value="">Custom...</option>
-                    <option v-for="preset in reportStore.datePresets" :key="preset.value" :value="preset.value">
-                      {{ preset.label }}
-                    </option>
-                  </select>
+                  />
                 </div>
 
                 <!-- Custom Date Range -->
@@ -54,20 +52,20 @@
                     <label class="mb-2 block text-xs font-medium text-gray-700 dark:text-gray-300">
                       Dari Tanggal
                     </label>
-                    <input
+                    <DateField
                       v-model="reportStore.startDate"
-                      type="date"
-                      class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      title="Dari Tanggal"
+                      button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>
                   <div>
                     <label class="mb-2 block text-xs font-medium text-gray-700 dark:text-gray-300">
                       Sampai Tanggal
                     </label>
-                    <input
+                    <DateField
                       v-model="reportStore.endDate"
-                      type="date"
-                      class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      title="Sampai Tanggal"
+                      button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>
                 </div>
@@ -139,16 +137,16 @@
 
         <!-- Date Range Inputs -->
         <div class="mt-4 flex items-center gap-2">
-          <input
+          <DateField
             v-model="reportStore.startDate"
-            type="date"
-            class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            title="Dari Tanggal"
+            button-class="flex items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           />
           <span class="text-gray-500">-</span>
-          <input
+          <DateField
             v-model="reportStore.endDate"
-            type="date"
-            class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            title="Sampai Tanggal"
+            button-class="flex items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           />
           <button
             @click="fetchReport()"
@@ -241,6 +239,8 @@ import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import SalesSummaryCards from '@/components/reports/SalesSummaryCards.vue'
 import SalesSummaryDetail from '@/components/reports/SalesSummaryDetail.vue'
 import LoadingSkeleton from '@/components/common/LoadingSkeleton.vue'
+import DateField from '@/components/common/DateField.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useSalesReportStore } from '@/stores/salesReport'
 import { useToast } from '@/composables/useToast'
 

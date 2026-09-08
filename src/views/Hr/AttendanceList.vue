@@ -16,22 +16,25 @@
           class="w-full rounded-xl border border-gray-300 bg-white py-2.5 pl-10 pr-4 text-xs text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
         />
       </div>
-      <input
+      <DateField
         v-model="filterDate"
-        type="date"
-        class="rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+        title="Filter Tanggal"
+        button-class="flex items-center justify-between gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
       />
-      <select
+      <SelectField
         v-model="filterStatus"
-        class="rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-      >
-        <option value="">Semua Status</option>
-        <option value="hadir">Hadir</option>
-        <option value="izin">Izin</option>
-        <option value="sakit">Sakit</option>
-        <option value="cuti">Cuti</option>
-        <option value="alpa">Alpa</option>
-      </select>
+        :options="[
+          { label: 'Semua Status', value: '' },
+          { label: 'Hadir', value: 'hadir' },
+          { label: 'Izin', value: 'izin' },
+          { label: 'Sakit', value: 'sakit' },
+          { label: 'Cuti', value: 'cuti' },
+          { label: 'Alpa', value: 'alpa' },
+        ]"
+        title="Pilih Status"
+        placeholder="Semua Status"
+        button-class="flex items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+      />
       <button
         @click="showModal = true"
         class="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-500"
@@ -116,14 +119,19 @@
         <div class="space-y-3">
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Karyawan <span class="text-red-500">*</span></label>
-            <select v-model="attForm.employee_id" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="">- Pilih -</option>
-              <option v-for="e in store.employees" :key="e.id" :value="e.id">{{ e.name }} ({{ e.employee_code }})</option>
-            </select>
+            <SelectField
+              v-model="attForm.employee_id"
+              :options="store.employees.map((e) => ({ label: `${e.name} (${e.employee_code})`, value: e.id }))"
+              title="Pilih Karyawan"
+              placeholder="- Pilih -"
+              searchable
+              search-placeholder="Cari karyawan..."
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tanggal <span class="text-red-500">*</span></label>
-            <input v-model="attForm.attendance_date" type="date" required class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+            <DateField v-model="attForm.attendance_date" title="Tanggal Absensi" button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
@@ -137,13 +145,18 @@
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Status <span class="text-red-500">*</span></label>
-            <select v-model="attForm.status" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="hadir">Hadir</option>
-              <option value="izin">Izin</option>
-              <option value="sakit">Sakit</option>
-              <option value="cuti">Cuti</option>
-              <option value="alpa">Alpa</option>
-            </select>
+            <SelectField
+              v-model="attForm.status"
+              :options="[
+                { label: 'Hadir', value: 'hadir' },
+                { label: 'Izin', value: 'izin' },
+                { label: 'Sakit', value: 'sakit' },
+                { label: 'Cuti', value: 'cuti' },
+                { label: 'Alpa', value: 'alpa' },
+              ]"
+              title="Status Absensi"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Keterangan</label>
@@ -166,6 +179,8 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DateField from '@/components/common/DateField.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useHrStore } from '@/stores/hr'
 import type { AttendanceInsert } from '@/types/database'
 

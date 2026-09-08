@@ -132,10 +132,10 @@
         </button>
         <button
           v-if="journal.status === 'posted'"
-          @click="handleVoid"
+          @click="handleDelete"
           class="flex-1 rounded-xl border border-red-500 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
         >
-          Void Jurnal
+          Hapus Jurnal
         </button>
       </div>
     </template>
@@ -174,7 +174,7 @@ const formatDate = (dateString: string) =>
   new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 
 const getStatusLabel = (s: string) => {
-  const labels: Record<string, string> = { posted: 'Posted', draft: 'Draft', void: 'Void' }
+  const labels: Record<string, string> = { posted: 'Posted', draft: 'Draft' }
   return labels[s] || s
 }
 
@@ -182,7 +182,6 @@ const getStatusBadge = (s: string) => {
   const badges: Record<string, string> = {
     posted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400',
     draft: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
-    void: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
   }
   return badges[s] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
 }
@@ -190,7 +189,7 @@ const getStatusBadge = (s: string) => {
 const getRefLabel = (r: string) => {
   const labels: Record<string, string> = {
     manual: 'Manual', transaction: 'Penjualan', return: 'Retur',
-    payment: 'Pembayaran', void: 'Pembatalan',
+    payment: 'Pembayaran',
   }
   return labels[r] || r
 }
@@ -201,16 +200,15 @@ const getRefBadge = (r: string) => {
     transaction: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400',
     return: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
     payment: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
-    void: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400',
   }
   return badges[r] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
 }
 
-const handleVoid = async () => {
-  if (!(await confirm('Void jurnal ini? Data tetap tersimpan tapi status menjadi void.'))) return
+const handleDelete = async () => {
+  if (!(await confirm('Hapus jurnal ini? Data akan dihapus permanen dan tidak dapat dikembalikan.'))) return
   try {
-    await store.voidJournal(journal.value!.id)
-    journal.value!.status = 'void'
+    await store.deleteJournal(journal.value!.id)
+    router.push('/finance/journals')
   } catch (e: any) {
     error.value = e.message
   }

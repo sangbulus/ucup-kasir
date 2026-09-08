@@ -30,10 +30,10 @@
           <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tanggal *</label>
-              <input
+              <DateField
                 v-model="form.entry_date"
-                type="date"
-                class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                title="Tanggal Jurnal"
+                button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               />
             </div>
             <div>
@@ -82,15 +82,15 @@
                 </button>
               </div>
 
-              <select
+              <SelectField
                 v-model="line.account_id"
-                class="mb-2 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="" disabled>Pilih akun...</option>
-                <option v-for="acc in store.accounts" :key="acc.id" :value="acc.id">
-                  {{ acc.code }} — {{ acc.name }}
-                </option>
-              </select>
+                :options="store.accounts.map((acc) => ({ label: `${acc.code} — ${acc.name}`, value: acc.id }))"
+                title="Pilih Akun"
+                placeholder="Pilih akun..."
+                searchable
+                search-placeholder="Cari akun..."
+                button-class="mb-2 flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
 
               <div class="grid grid-cols-2 gap-2">
                 <div>
@@ -165,6 +165,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import CurrencyInput from '@/components/common/CurrencyInput.vue'
+import DateField from '@/components/common/DateField.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import { useFinanceStore } from '@/stores/finance'

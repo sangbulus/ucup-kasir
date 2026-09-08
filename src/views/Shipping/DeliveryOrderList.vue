@@ -124,7 +124,6 @@ const statusFilters = [
   { value: 'disiapkan', label: 'Disiapkan' },
   { value: 'dikirim', label: 'Dikirim' },
   { value: 'selesai', label: 'Selesai' },
-  { value: 'batal', label: 'Batal' },
 ]
 
 const filtered = computed(() => {
@@ -147,7 +146,6 @@ const getStatusBadge = (status: string) => {
     case 'disiapkan': return 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
     case 'dikirim': return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
     case 'selesai': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
-    case 'batal': return 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
     default: return 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
   }
 }
@@ -158,7 +156,6 @@ const statusLabel = (s: string) => {
     case 'disiapkan': return 'Siap'
     case 'dikirim': return 'Dikirim'
     case 'selesai': return 'Selesai'
-    case 'batal': return 'Batal'
     default: return s
   }
 }

@@ -68,14 +68,14 @@ const DOWNLOAD_TABLES = [
   'pi_payments',
   'purchase_returns',
   'purchase_return_items',
-  'departments',
-  'positions',
   'employees',
   'attendance',
   'payroll_components',
   'payroll_periods',
   'payrolls',
   'payroll_items',
+  'employee_loans',
+  'employee_loan_payments',
   'vehicles',
   'delivery_orders',
   'delivery_items',
@@ -123,8 +123,9 @@ export async function downloadAllFromSupabase(): Promise<SyncResult> {
            chartOfAccounts, journalEntries, journalLines,
            suppliers, purchaseOrders, poItems, goodsReceipts, grnItems,
            purchaseInvoices, piItems, piPayments, purchaseReturns, purchaseReturnItems,
-           departments, positions, employees, attendance,
+           employees, attendance,
            payrollComponents, payrollPeriods, payrolls, payrollItems,
+           employeeLoans, employeeLoanPayments,
            vehicles, deliveryOrders, deliveryItems, deliveryTracking,
            doTransactions, deliveryLoaders, deliveryLoadItems] = await Promise.all([
       fetchAllFromTable('categories'),
@@ -155,14 +156,14 @@ export async function downloadAllFromSupabase(): Promise<SyncResult> {
       fetchAllFromTable('pi_payments'),
       fetchAllFromTable('purchase_returns'),
       fetchAllFromTable('purchase_return_items'),
-      fetchAllFromTable('departments'),
-      fetchAllFromTable('positions'),
       fetchAllFromTable('employees'),
       fetchAllFromTable('attendance'),
       fetchAllFromTable('payroll_components'),
       fetchAllFromTable('payroll_periods'),
       fetchAllFromTable('payrolls'),
       fetchAllFromTable('payroll_items'),
+      fetchAllFromTable('employee_loans'),
+      fetchAllFromTable('employee_loan_payments'),
       fetchAllFromTable('vehicles'),
       fetchAllFromTable('delivery_orders'),
       fetchAllFromTable('delivery_items'),
@@ -275,9 +276,7 @@ export async function downloadAllFromSupabase(): Promise<SyncResult> {
       }
       await sqlitePurchasingService.replaceAllPurchaseReturns([...prMap.values()])
 
-      // HR: departments, positions, employees, attendance, payroll components, periods, payrolls
-      await sqliteHrService.replaceAllDepartments(departments)
-      await sqliteHrService.replaceAllPositions(positions)
+      // HR: employees, attendance, payroll components, periods, payrolls, kasbon
       await sqliteHrService.replaceAllEmployees(employees)
       await sqliteHrService.replaceAllAttendance(attendance)
       await sqliteHrService.replaceAllPayrollComponents(payrollComponents)
@@ -290,6 +289,14 @@ export async function downloadAllFromSupabase(): Promise<SyncResult> {
         if (p) p.items.push(it)
       }
       await sqliteHrService.replaceAllPayrolls([...payrollMap.values()])
+
+      const loanMap = new Map<string, any>()
+      for (const loan of employeeLoans) loanMap.set(loan.id, { ...loan, payments: [] })
+      for (const payment of employeeLoanPayments) {
+        const loan = loanMap.get(payment.loan_id)
+        if (loan) loan.payments.push(payment)
+      }
+      await sqliteHrService.replaceAllEmployeeLoans([...loanMap.values()])
 
       // shipping: vehicles + delivery orders (gabungkan items + tracking)
       await sqliteShippingService.replaceAllVehicles(vehicles)
@@ -508,12 +515,6 @@ async function processQueueItem(item: SyncQueueItem): Promise<void> {
     case 'purchase_return_items':
       await genericUpsert('purchase_return_items', operation, record_id, data)
       break
-    case 'departments':
-      await genericUpsert('departments', operation, record_id, data)
-      break
-    case 'positions':
-      await genericUpsert('positions', operation, record_id, data)
-      break
     case 'employees':
       await genericUpsert('employees', operation, record_id, data)
       break
@@ -531,6 +532,12 @@ async function processQueueItem(item: SyncQueueItem): Promise<void> {
       break
     case 'payroll_items':
       await genericUpsert('payroll_items', operation, record_id, data)
+      break
+    case 'employee_loans':
+      await genericUpsert('employee_loans', operation, record_id, data)
+      break
+    case 'employee_loan_payments':
+      await genericUpsert('employee_loan_payments', operation, record_id, data)
       break
     case 'vehicles':
       await genericUpsert('vehicles', operation, record_id, data)
@@ -639,8 +646,9 @@ export async function uploadAllToSupabase(): Promise<SyncResult> {
     'goods_receipts', 'grn_items',
     'purchase_invoices', 'pi_items', 'pi_payments',
     'purchase_returns', 'purchase_return_items',
-    'departments', 'positions', 'employees', 'attendance',
+    'employees', 'attendance',
     'payroll_components', 'payroll_periods', 'payrolls', 'payroll_items',
+    'employee_loans', 'employee_loan_payments',
     'vehicles', 'delivery_orders', 'delivery_items', 'delivery_tracking',
   ]
 

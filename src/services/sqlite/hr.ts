@@ -1,12 +1,6 @@
 import { query, queryOne, run, addToSyncQueue, transaction } from './db'
 import { getCurrentUserId, uuid, nowIso } from './db'
 import type {
-  Department,
-  DepartmentInsert,
-  DepartmentUpdate,
-  Position,
-  PositionInsert,
-  PositionUpdate,
   Employee,
   EmployeeInsert,
   EmployeeUpdate,
@@ -23,169 +17,26 @@ import type {
   Payroll,
   PayrollItem,
   PayrollSummary,
+  EmployeeLoan,
+  EmployeeLoanInsert,
+  EmployeeLoanUpdate,
+  EmployeeLoanPayment,
+  EmployeeLoanPaymentInsert,
+  KasbonChoice,
+  KasbonDeductionResult,
 } from '@/types/database'
 
 // ============================================================
 // SQLite Service: HR & Payroll
-// Mirror dari src/services/hr.ts
+// Mirror dari src/services/hr.ts — tanpa master Departemen/Jabatan
+// (jabatan kini teks tetap 'supir' | 'loader').
 // Semua fungsi replikasi dari Supabase + RPC:
-//   - generate_payroll
-//   - post_payroll_journal
+//   - generate_payroll (JS mirror)
+//   - apply_kasbon_deductions (JS mirror)
+//   - post_payroll_journal (JS mirror)
 // ============================================================
 
 export const sqliteHrService = {
-  // ============================================================
-  // DEPARTMENTS
-  // ============================================================
-
-  async fetchDepartments(): Promise<Department[]> {
-    const userId = getCurrentUserId()
-    const rows = await query<any>(
-      `SELECT * FROM departments WHERE user_id = ? ORDER BY name`,
-      [userId]
-    )
-    return rows.map(this.mapDepartment)
-  },
-
-  async getDepartment(id: string): Promise<Department | null> {
-    const userId = getCurrentUserId()
-    const row = await queryOne<any>(
-      `SELECT * FROM departments WHERE id = ? AND user_id = ?`,
-      [id, userId]
-    )
-    return row ? this.mapDepartment(row) : null
-  },
-
-  async createDepartment(input: DepartmentInsert): Promise<Department> {
-    const userId = getCurrentUserId()
-    const id = uuid()
-    const now = nowIso()
-
-    await run(
-      `INSERT INTO departments (id, user_id, name, description, is_active, created_at, updated_at, sync_status, updated_at_local)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
-      [id, userId, input.name, input.description || null,
-       input.is_active !== false ? 1 : 0, now, now, now]
-    )
-
-    const dept = await this.getDepartment(id)
-    await addToSyncQueue('INSERT', 'departments', id, dept || { id })
-    return dept!
-  },
-
-  async updateDepartment(id: string, updates: DepartmentUpdate): Promise<Department> {
-    const userId = getCurrentUserId()
-    const now = nowIso()
-    const fields: string[] = []
-    const values: any[] = []
-
-    if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
-    if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description) }
-    if (updates.is_active !== undefined) { fields.push('is_active = ?'); values.push(updates.is_active ? 1 : 0) }
-
-    fields.push('updated_at = ?', 'sync_status = ?', 'updated_at_local = ?')
-    values.push(now, 'pending', now, id, userId)
-
-    await run(
-      `UPDATE departments SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`,
-      values
-    )
-
-    const dept = await this.getDepartment(id)
-    await addToSyncQueue('UPDATE', 'departments', id, dept || { id })
-    return dept!
-  },
-
-  async deleteDepartment(id: string): Promise<void> {
-    const userId = getCurrentUserId()
-    await run(`DELETE FROM departments WHERE id = ? AND user_id = ?`, [id, userId])
-    await addToSyncQueue('DELETE', 'departments', id, { id })
-  },
-
-  // ============================================================
-  // POSITIONS
-  // ============================================================
-
-  async fetchPositions(): Promise<Position[]> {
-    const userId = getCurrentUserId()
-    const rows = await query<any>(
-      `SELECT * FROM positions WHERE user_id = ? ORDER BY name`,
-      [userId]
-    )
-    return rows.map(this.mapPosition)
-  },
-
-  async fetchPositionsWithDepartment(): Promise<Position[]> {
-    const userId = getCurrentUserId()
-    const rows = await query<any>(
-      `SELECT p.*, d.name as department_name
-       FROM positions p
-       LEFT JOIN departments d ON d.id = p.department_id
-       WHERE p.user_id = ? ORDER BY p.name`,
-      [userId]
-    )
-    return rows.map((r: any) => ({
-      ...this.mapPosition(r),
-      department: r.department_name ? { name: r.department_name } as any : undefined,
-    }))
-  },
-
-  async getPosition(id: string): Promise<Position | null> {
-    const userId = getCurrentUserId()
-    const row = await queryOne<any>(
-      `SELECT * FROM positions WHERE id = ? AND user_id = ?`,
-      [id, userId]
-    )
-    return row ? this.mapPosition(row) : null
-  },
-
-  async createPosition(input: PositionInsert): Promise<Position> {
-    const userId = getCurrentUserId()
-    const id = uuid()
-    const now = nowIso()
-
-    await run(
-      `INSERT INTO positions (id, user_id, department_id, name, base_salary, is_active, created_at, updated_at, sync_status, updated_at_local)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
-      [id, userId, input.department_id || null, input.name,
-       input.base_salary || 0, input.is_active !== false ? 1 : 0, now, now, now]
-    )
-
-    const pos = await this.getPosition(id)
-    await addToSyncQueue('INSERT', 'positions', id, pos || { id })
-    return pos!
-  },
-
-  async updatePosition(id: string, updates: PositionUpdate): Promise<Position> {
-    const userId = getCurrentUserId()
-    const now = nowIso()
-    const fields: string[] = []
-    const values: any[] = []
-
-    if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
-    if (updates.department_id !== undefined) { fields.push('department_id = ?'); values.push(updates.department_id || null) }
-    if (updates.base_salary !== undefined) { fields.push('base_salary = ?'); values.push(updates.base_salary) }
-    if (updates.is_active !== undefined) { fields.push('is_active = ?'); values.push(updates.is_active ? 1 : 0) }
-
-    fields.push('updated_at = ?', 'sync_status = ?', 'updated_at_local = ?')
-    values.push(now, 'pending', now, id, userId)
-
-    await run(
-      `UPDATE positions SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`,
-      values
-    )
-
-    const pos = await this.getPosition(id)
-    await addToSyncQueue('UPDATE', 'positions', id, pos || { id })
-    return pos!
-  },
-
-  async deletePosition(id: string): Promise<void> {
-    const userId = getCurrentUserId()
-    await run(`DELETE FROM positions WHERE id = ? AND user_id = ?`, [id, userId])
-    await addToSyncQueue('DELETE', 'positions', id, { id })
-  },
-
   // ============================================================
   // EMPLOYEES
   // ============================================================
@@ -193,36 +44,19 @@ export const sqliteHrService = {
   async fetchEmployees(): Promise<Employee[]> {
     const userId = getCurrentUserId()
     const rows = await query<any>(
-      `SELECT e.*, d.name as department_name, p.name as position_name
-       FROM employees e
-       LEFT JOIN departments d ON d.id = e.department_id
-       LEFT JOIN positions p ON p.id = e.position_id
-       WHERE e.user_id = ? ORDER BY e.name`,
+      `SELECT * FROM employees WHERE user_id = ? ORDER BY name`,
       [userId]
     )
-    return rows.map((r: any) => ({
-      ...this.mapEmployee(r),
-      department: r.department_name ? { name: r.department_name } as any : undefined,
-      position: r.position_name ? { name: r.position_name } as any : undefined,
-    }))
+    return rows.map(this.mapEmployee)
   },
 
   async getEmployee(id: string): Promise<Employee | null> {
     const userId = getCurrentUserId()
     const row = await queryOne<any>(
-      `SELECT e.*, d.name as department_name, p.name as position_name
-       FROM employees e
-       LEFT JOIN departments d ON d.id = e.department_id
-       LEFT JOIN positions p ON p.id = e.position_id
-       WHERE e.id = ? AND e.user_id = ?`,
+      `SELECT * FROM employees WHERE id = ? AND user_id = ?`,
       [id, userId]
     )
-    if (!row) return null
-    return {
-      ...this.mapEmployee(row),
-      department: row.department_name ? { name: row.department_name } as any : undefined,
-      position: row.position_name ? { name: row.position_name } as any : undefined,
-    }
+    return row ? this.mapEmployee(row) : null
   },
 
   async generateEmployeeCode(): Promise<string> {
@@ -250,13 +84,13 @@ export const sqliteHrService = {
 
     await run(
       `INSERT INTO employees (id, user_id, employee_code, name, gender, birth_place, birth_date,
-        phone, email, address, identity_type, identity_number, department_id, position_id,
+        phone, email, address, identity_type, identity_number, position,
         join_date, resign_date, status, salary_type, base_salary, bank_name, bank_account_number,
         bank_account_name, npwp, notes, is_active, created_at, updated_at, sync_status, updated_at_local)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
       [id, userId, code, input.name, input.gender || null, input.birth_place || null, input.birth_date || null,
        input.phone || null, input.email || null, input.address || null, input.identity_type || null,
-       input.identity_number || null, input.department_id || null, input.position_id || null,
+       input.identity_number || null, input.position || null,
        input.join_date || null, input.resign_date || null, input.status || 'aktif',
        input.salary_type || 'bulanan', input.base_salary || 0, input.bank_name || null,
        input.bank_account_number || null, input.bank_account_name || null, input.npwp || null,
@@ -276,7 +110,7 @@ export const sqliteHrService = {
 
     const updatable = [
       'name', 'gender', 'birth_place', 'birth_date', 'phone', 'email', 'address',
-      'identity_type', 'identity_number', 'department_id', 'position_id', 'join_date',
+      'identity_type', 'identity_number', 'position', 'join_date',
       'resign_date', 'status', 'salary_type', 'base_salary', 'bank_name',
       'bank_account_number', 'bank_account_name', 'npwp', 'notes', 'is_active',
     ] as const
@@ -459,16 +293,14 @@ export const sqliteHrService = {
   async fetchPayrollComponents(): Promise<PayrollComponent[]> {
     const userId = getCurrentUserId()
     const rows = await query<any>(
-      `SELECT pc.*, p.name AS position_name, e.name AS employee_name
+      `SELECT pc.*, e.name AS employee_name
        FROM payroll_components pc
-       LEFT JOIN positions p ON p.id = pc.position_id
        LEFT JOIN employees e ON e.id = pc.employee_id
        WHERE pc.user_id = ? ORDER BY pc.type, pc.name`,
       [userId]
     )
     return rows.map((r) => ({
       ...this.mapPayrollComponent(r),
-      position: r.position_name ? { name: r.position_name } : null,
       employee: r.employee_name ? { name: r.employee_name } : null,
     }))
   },
@@ -479,11 +311,11 @@ export const sqliteHrService = {
     const now = nowIso()
 
     await run(
-      `INSERT INTO payroll_components (id, user_id, name, type, amount, is_percentage, apply_to, position_id, employee_id, is_active, created_at, updated_at, sync_status, updated_at_local)
+      `INSERT INTO payroll_components (id, user_id, name, type, amount, is_percentage, apply_to, position, employee_id, is_active, created_at, updated_at, sync_status, updated_at_local)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
       [id, userId, input.name, input.type, input.amount || 0,
        input.is_percentage ? 1 : 0, input.apply_to || 'semua',
-       input.position_id || null, input.employee_id || null,
+       input.position || null, input.employee_id || null,
        input.is_active !== false ? 1 : 0, now, now, now]
     )
 
@@ -507,7 +339,7 @@ export const sqliteHrService = {
     const fields: string[] = []
     const values: any[] = []
 
-    const updatable = ['name', 'type', 'amount', 'is_percentage', 'apply_to', 'position_id', 'employee_id', 'is_active'] as const
+    const updatable = ['name', 'type', 'amount', 'is_percentage', 'apply_to', 'position', 'employee_id', 'is_active'] as const
     for (const key of updatable) {
       if ((updates as any)[key] !== undefined) {
         const val = (updates as any)[key]
@@ -644,7 +476,7 @@ export const sqliteHrService = {
   async fetchPayrolls(periodId: string): Promise<Payroll[]> {
     const userId = getCurrentUserId()
     const rows = await query<any>(
-      `SELECT p.*, e.name as employee_name, e.employee_code, e.department_id, e.position_id,
+      `SELECT p.*, e.name as employee_name, e.employee_code, e.position,
               e.bank_name, e.bank_account_number, e.bank_account_name
        FROM payrolls p
        LEFT JOIN employees e ON e.id = p.employee_id
@@ -665,6 +497,7 @@ export const sqliteHrService = {
         employee: r.employee_name ? {
           name: r.employee_name,
           employee_code: r.employee_code,
+          position: r.position,
           bank_name: r.bank_name,
           bank_account_number: r.bank_account_number,
           bank_account_name: r.bank_account_name,
@@ -678,7 +511,7 @@ export const sqliteHrService = {
   async getPayroll(id: string): Promise<Payroll | null> {
     const userId = getCurrentUserId()
     const row = await queryOne<any>(
-      `SELECT p.*, e.name as employee_name, e.employee_code, e.department_id, e.position_id,
+      `SELECT p.*, e.name as employee_name, e.employee_code, e.position,
               e.bank_name, e.bank_account_number, e.bank_account_name
        FROM payrolls p
        LEFT JOIN employees e ON e.id = p.employee_id
@@ -698,6 +531,7 @@ export const sqliteHrService = {
       employee: row.employee_name ? {
         name: row.employee_name,
         employee_code: row.employee_code,
+        position: row.position,
         bank_name: row.bank_name,
         bank_account_number: row.bank_account_number,
         bank_account_name: row.bank_account_name,
@@ -730,10 +564,7 @@ export const sqliteHrService = {
 
     // Ambil semua karyawan aktif
     const employees = await query<any>(
-      `SELECT e.*, p.base_salary as position_salary
-       FROM employees e
-       LEFT JOIN positions p ON p.id = e.position_id
-       WHERE e.user_id = ? AND e.is_active = 1 AND e.status = 'aktif'`,
+      `SELECT * FROM employees WHERE user_id = ? AND is_active = 1 AND status = 'aktif'`,
       [userId]
     )
 
@@ -795,7 +626,7 @@ export const sqliteHrService = {
 
     for (const emp of employees) {
       const payrollId = uuid()
-      const grossSalary = emp.base_salary && emp.base_salary > 0 ? emp.base_salary : (emp.position_salary || 0)
+      const grossSalary = emp.base_salary && emp.base_salary > 0 ? emp.base_salary : 0
       let totalAllowance = 0
       let totalDeduction = 0
       const items: PayrollItem[] = []
@@ -811,7 +642,7 @@ export const sqliteHrService = {
       // Hitung komponen
       for (const comp of components) {
         // Cek apakah komponen berlaku untuk karyawan ini
-        if (comp.apply_to === 'per_jabatan' && comp.position_id !== emp.position_id) continue
+        if (comp.apply_to === 'per_jabatan' && comp.position !== emp.position) continue
         if (comp.apply_to === 'per_karyawan' && comp.employee_id !== emp.id) continue
 
         const isPercentage = !!comp.is_percentage
@@ -1007,34 +838,317 @@ export const sqliteHrService = {
   },
 
   // ============================================================
-  // Sync helpers
+  // EMPLOYEE LOANS (KASBON)
   // ============================================================
 
-  async replaceAllDepartments(records: Department[]): Promise<void> {
+  async fetchEmployeeLoans(): Promise<EmployeeLoan[]> {
     const userId = getCurrentUserId()
-    await run('DELETE FROM departments WHERE user_id = ?', [userId])
-    const now = nowIso()
-    for (const r of records) {
-      await run(
-        `INSERT OR REPLACE INTO departments (id, user_id, name, description, is_active, created_at, updated_at, sync_status, updated_at_local)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
-        [r.id, r.user_id || userId, r.name, r.description || null, r.is_active ? 1 : 0, r.created_at, r.updated_at, r.updated_at || now]
+    const rows = await query<any>(
+      `SELECT el.*, e.name as employee_name, e.employee_code, e.position
+       FROM employee_loans el
+       LEFT JOIN employees e ON e.id = el.employee_id
+       WHERE el.user_id = ? ORDER BY el.loan_date DESC`,
+      [userId]
+    )
+    const result: EmployeeLoan[] = []
+    for (const r of rows) {
+      const payments = await query<any>(
+        `SELECT * FROM employee_loan_payments WHERE loan_id = ? AND user_id = ? ORDER BY payment_date DESC`,
+        [r.id, userId]
       )
+      result.push({
+        ...this.mapEmployeeLoan(r),
+        employee: r.employee_name ? {
+          id: r.employee_id,
+          name: r.employee_name,
+          employee_code: r.employee_code,
+          position: r.position,
+        } as any : undefined,
+        payments: payments.map(this.mapEmployeeLoanPayment),
+      })
+    }
+    return result
+  },
+
+  async getEmployeeLoan(id: string): Promise<EmployeeLoan | null> {
+    const userId = getCurrentUserId()
+    const row = await queryOne<any>(
+      `SELECT el.*, e.name as employee_name, e.employee_code, e.position
+       FROM employee_loans el
+       LEFT JOIN employees e ON e.id = el.employee_id
+       WHERE el.id = ? AND el.user_id = ?`,
+      [id, userId]
+    )
+    if (!row) return null
+
+    const payments = await query<any>(
+      `SELECT * FROM employee_loan_payments WHERE loan_id = ? AND user_id = ? ORDER BY payment_date DESC`,
+      [id, userId]
+    )
+
+    return {
+      ...this.mapEmployeeLoan(row),
+      employee: row.employee_name ? {
+        id: row.employee_id,
+        name: row.employee_name,
+        employee_code: row.employee_code,
+        position: row.position,
+      } as any : undefined,
+      payments: payments.map(this.mapEmployeeLoanPayment),
     }
   },
 
-  async replaceAllPositions(records: Position[]): Promise<void> {
+  async createEmployeeLoan(input: EmployeeLoanInsert): Promise<EmployeeLoan> {
     const userId = getCurrentUserId()
-    await run('DELETE FROM positions WHERE user_id = ?', [userId])
+    const id = uuid()
     const now = nowIso()
-    for (const r of records) {
-      await run(
-        `INSERT OR REPLACE INTO positions (id, user_id, department_id, name, base_salary, is_active, created_at, updated_at, sync_status, updated_at_local)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
-        [r.id, r.user_id || userId, r.department_id || null, r.name, r.base_salary, r.is_active ? 1 : 0, r.created_at, r.updated_at, r.updated_at || now]
-      )
-    }
+
+    await run(
+      `INSERT INTO employee_loans (id, user_id, employee_id, loan_date, amount, remaining_amount, description, status, created_at, updated_at, sync_status, updated_at_local)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+      [id, userId, input.employee_id, input.loan_date, input.amount, input.amount,
+       input.description || null, input.status || 'active', now, now, now]
+    )
+
+    const loan = await this.getEmployeeLoan(id)
+    await addToSyncQueue('INSERT', 'employee_loans', id, loan || { id })
+    return loan!
   },
+
+  async updateEmployeeLoan(id: string, updates: EmployeeLoanUpdate): Promise<EmployeeLoan> {
+    const userId = getCurrentUserId()
+    const now = nowIso()
+    const fields: string[] = []
+    const values: any[] = []
+
+    const updatable = ['employee_id', 'loan_date', 'amount', 'remaining_amount', 'description', 'status'] as const
+    for (const key of updatable) {
+      if ((updates as any)[key] !== undefined) {
+        fields.push(`${key} = ?`)
+        values.push((updates as any)[key])
+      }
+    }
+
+    // Kalau amount diubah tapi remaining_amount tidak diberikan, hitung ulang
+    if (updates.amount !== undefined && updates.remaining_amount === undefined) {
+      const existing = await this.getEmployeeLoan(id)
+      if (existing) {
+        const paid = Number(existing.amount) - Number(existing.remaining_amount)
+        const newRemaining = Math.max(0, Number(updates.amount) - paid)
+        const idx = fields.findIndex(f => f === 'remaining_amount = ?')
+        if (idx !== -1) {
+          values[idx] = newRemaining
+        } else {
+          fields.push('remaining_amount = ?')
+          values.push(newRemaining)
+        }
+        // Auto-update status
+        if (updates.status === undefined) {
+          const statusIdx = fields.findIndex(f => f === 'status = ?')
+          const newStatus = newRemaining <= 0 ? 'paid' : 'active'
+          if (statusIdx !== -1) {
+            values[statusIdx] = newStatus
+          } else {
+            fields.push('status = ?')
+            values.push(newStatus)
+          }
+        }
+      }
+    }
+
+    fields.push('updated_at = ?', 'sync_status = ?', 'updated_at_local = ?')
+    values.push(now, 'pending', now, id, userId)
+
+    await run(
+      `UPDATE employee_loans SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`,
+      values
+    )
+
+    const loan = await this.getEmployeeLoan(id)
+    await addToSyncQueue('UPDATE', 'employee_loans', id, loan || { id })
+    return loan!
+  },
+
+  async deleteEmployeeLoan(id: string): Promise<void> {
+    const userId = getCurrentUserId()
+    await run(`DELETE FROM employee_loans WHERE id = ? AND user_id = ?`, [id, userId])
+    await addToSyncQueue('DELETE', 'employee_loans', id, { id })
+  },
+
+  async createLoanPayment(input: EmployeeLoanPaymentInsert): Promise<EmployeeLoanPayment> {
+    const userId = getCurrentUserId()
+    const id = uuid()
+    const now = nowIso()
+
+    await run(
+      `INSERT INTO employee_loan_payments (id, user_id, loan_id, payroll_id, payment_date, amount, notes, created_at, sync_status, updated_at_local)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+      [id, userId, input.loan_id, input.payroll_id || null, input.payment_date,
+       input.amount, input.notes || null, now, now]
+    )
+
+    // Update remaining_amount kasbon
+    await run(
+      `UPDATE employee_loans SET remaining_amount = remaining_amount - ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
+       WHERE id = ? AND user_id = ?`,
+      [input.amount, now, now, input.loan_id, userId]
+    )
+
+    // Update status jadi 'paid' kalau sisa <= 0
+    await run(
+      `UPDATE employee_loans SET status = 'paid' WHERE id = ? AND user_id = ? AND remaining_amount <= 0`,
+      [input.loan_id, userId]
+    )
+
+    const payment = await queryOne<any>(
+      `SELECT * FROM employee_loan_payments WHERE id = ? AND user_id = ?`,
+      [id, userId]
+    )
+
+    await addToSyncQueue('INSERT', 'employee_loan_payments', id, payment || { id })
+    await addToSyncQueue('UPDATE', 'employee_loans', input.loan_id, { id: input.loan_id })
+
+    return this.mapEmployeeLoanPayment(payment!)
+  },
+
+  /**
+   * Terapkan potongan kasbon ke payroll periode (JS mirror dari RPC).
+   * Choices: { "<employee_id>": 'all' | 'half' | 'none' | "<nominal>" }
+   */
+  async applyKasbonDeductions(periodId: string, choices: Record<string, KasbonChoice>): Promise<KasbonDeductionResult> {
+    const userId = getCurrentUserId()
+    const now = nowIso()
+
+    let appliedCount = 0
+    let appliedAmount = 0
+
+    // Ambil semua slip payroll periode ini
+    const payrolls = await query<any>(
+      `SELECT * FROM payrolls WHERE period_id = ? AND user_id = ? AND status = 'draft'`,
+      [periodId, userId]
+    )
+
+    for (const p of payrolls) {
+      const choice = choices[p.employee_id] || 'all'
+      if (choice === 'none') continue
+
+      // Ambil kasbon aktif karyawan ini, FIFO
+      const loans = await query<any>(
+        `SELECT * FROM employee_loans
+         WHERE employee_id = ? AND user_id = ? AND status = 'active' AND remaining_amount > 0
+         ORDER BY loan_date ASC`,
+        [p.employee_id, userId]
+      )
+
+      if (loans.length === 0) continue
+
+      const totalGross = Number(p.total_gross) || 0
+      const totalDeduction = Number(p.total_deduction) || 0
+      let remainingAllowed = totalGross - totalDeduction
+      if (remainingAllowed <= 0) continue
+
+      // Custom cap (total maksimal per karyawan)
+      let customCap: number | null = null
+      if (choice !== 'all' && choice !== 'half') {
+        const parsed = parseFloat(choice)
+        if (!isNaN(parsed) && parsed > 0) {
+          customCap = parsed
+        }
+      }
+
+      let totalPaidThisEmployee = 0
+
+      for (const loan of loans) {
+        if (remainingAllowed <= 0) break
+        if (customCap !== null && totalPaidThisEmployee >= customCap) break
+
+        const remaining = Number(loan.remaining_amount) || 0
+        if (remaining <= 0) continue
+
+        let toPay = 0
+        if (choice === 'all') {
+          toPay = Math.min(remaining, remainingAllowed)
+        } else if (choice === 'half') {
+          toPay = Math.min(Math.floor(remaining / 2), remainingAllowed)
+        } else if (customCap !== null) {
+          const capLeft = customCap - totalPaidThisEmployee
+          toPay = Math.min(remaining, remainingAllowed, capLeft)
+        }
+
+        if (toPay <= 0) continue
+
+        // Insert payment
+        const paymentId = uuid()
+        await run(
+          `INSERT INTO employee_loan_payments (id, user_id, loan_id, payroll_id, payment_date, amount, notes, created_at, sync_status, updated_at_local)
+           VALUES (?, ?, ?, ?, ?, ?, 'Potongan otomatis dari payroll', ?, 'pending', ?)`,
+          [paymentId, userId, loan.id, p.id, now.split('T')[0], toPay, now, now]
+        )
+
+        // Update remaining kasbon
+        await run(
+          `UPDATE employee_loans SET remaining_amount = remaining_amount - ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
+           WHERE id = ? AND user_id = ?`,
+          [toPay, now, now, loan.id, userId]
+        )
+        await run(
+          `UPDATE employee_loans SET status = 'paid' WHERE id = ? AND user_id = ? AND remaining_amount <= 0`,
+          [loan.id, userId]
+        )
+
+        // Insert payroll_item
+        const itemId = uuid()
+        await run(
+          `INSERT INTO payroll_items (id, user_id, payroll_id, component_id, component_name, component_type, amount, created_at, sync_status, updated_at_local)
+           VALUES (?, ?, ?, NULL, 'Potongan Kasbon', 'potongan', ?, ?, 'pending', ?)`,
+          [itemId, userId, p.id, toPay, now, now]
+        )
+
+        remainingAllowed -= toPay
+        totalPaidThisEmployee += toPay
+        appliedCount++
+        appliedAmount += toPay
+
+        await addToSyncQueue('INSERT', 'employee_loan_payments', paymentId, { id: paymentId })
+        await addToSyncQueue('UPDATE', 'employee_loans', loan.id, { id: loan.id })
+        await addToSyncQueue('INSERT', 'payroll_items', itemId, { id: itemId })
+      }
+
+      // Update payroll total
+      if (totalPaidThisEmployee > 0) {
+        const newDeduction = totalDeduction + totalPaidThisEmployee
+        const newNet = totalGross - newDeduction
+        await run(
+          `UPDATE payrolls SET total_deduction = ?, total_net = ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
+           WHERE id = ? AND user_id = ?`,
+          [newDeduction, newNet, now, now, p.id, userId]
+        )
+        await addToSyncQueue('UPDATE', 'payrolls', p.id, { id: p.id })
+      }
+    }
+
+    // Update period recap
+    if (appliedCount > 0) {
+      const periodRows = await query<any>(
+        `SELECT SUM(total_deduction) as sum_deduction, SUM(total_net) as sum_net FROM payrolls WHERE period_id = ? AND user_id = ?`,
+        [periodId, userId]
+      )
+      const sumDeduction = Number(periodRows[0]?.sum_deduction) || 0
+      const sumNet = Number(periodRows[0]?.sum_net) || 0
+      await run(
+        `UPDATE payroll_periods SET total_deduction = ?, total_net = ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
+         WHERE id = ? AND user_id = ?`,
+        [sumDeduction, sumNet, now, now, periodId, userId]
+      )
+      await addToSyncQueue('UPDATE', 'payroll_periods', periodId, { id: periodId })
+    }
+
+    return { applied_count: appliedCount, applied_amount: appliedAmount }
+  },
+
+  // ============================================================
+  // Sync helpers
+  // ============================================================
 
   async replaceAllEmployees(records: Employee[]): Promise<void> {
     const userId = getCurrentUserId()
@@ -1043,13 +1157,13 @@ export const sqliteHrService = {
     for (const r of records) {
       await run(
         `INSERT OR REPLACE INTO employees (id, user_id, employee_code, name, gender, birth_place, birth_date,
-          phone, email, address, identity_type, identity_number, department_id, position_id,
+          phone, email, address, identity_type, identity_number, position,
           join_date, resign_date, status, salary_type, base_salary, bank_name, bank_account_number,
           bank_account_name, npwp, notes, is_active, created_at, updated_at, sync_status, updated_at_local)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
         [r.id, r.user_id || userId, r.employee_code, r.name, r.gender || null, r.birth_place || null, r.birth_date || null,
          r.phone || null, r.email || null, r.address || null, 'KTP', r.identity_number || null,
-         r.department_id || null, r.position_id || null, r.join_date || null, r.resign_date || null,
+         r.position || null, r.join_date || null, r.resign_date || null,
          r.status, r.salary_type, r.base_salary, r.bank_name || null, r.bank_account_number || null,
          r.bank_account_name || null, r.npwp || null, r.notes || null, r.is_active ? 1 : 0,
          r.created_at, r.updated_at, r.updated_at || now]
@@ -1077,11 +1191,34 @@ export const sqliteHrService = {
     const now = nowIso()
     for (const r of records) {
       await run(
-        `INSERT OR REPLACE INTO payroll_components (id, user_id, name, type, amount, is_percentage, apply_to, position_id, employee_id, is_active, created_at, updated_at, sync_status, updated_at_local)
+        `INSERT OR REPLACE INTO payroll_components (id, user_id, name, type, amount, is_percentage, apply_to, position, employee_id, is_active, created_at, updated_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
         [r.id, r.user_id || userId, r.name, r.type, r.amount, r.is_percentage ? 1 : 0, r.apply_to,
-         r.position_id || null, r.employee_id || null, r.is_active ? 1 : 0, r.created_at, r.updated_at, r.updated_at || now]
+         r.position || null, r.employee_id || null, r.is_active ? 1 : 0, r.created_at, r.updated_at, r.updated_at || now]
       )
+    }
+  },
+
+  async replaceAllEmployeeLoans(records: Array<EmployeeLoan & { payments?: EmployeeLoanPayment[] }>): Promise<void> {
+    const userId = getCurrentUserId()
+    await run('DELETE FROM employee_loan_payments WHERE loan_id IN (SELECT id FROM employee_loans WHERE user_id = ?)', [userId])
+    await run('DELETE FROM employee_loans WHERE user_id = ?', [userId])
+    const now = nowIso()
+    for (const r of records) {
+      await run(
+        `INSERT OR REPLACE INTO employee_loans (id, user_id, employee_id, loan_date, amount, remaining_amount, description, status, created_at, updated_at, sync_status, updated_at_local)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
+        [r.id, r.user_id || userId, r.employee_id, r.loan_date, r.amount, r.remaining_amount,
+         r.description || null, r.status, r.created_at, r.updated_at, r.updated_at || now]
+      )
+      for (const payment of r.payments || []) {
+        await run(
+          `INSERT OR REPLACE INTO employee_loan_payments (id, user_id, loan_id, payroll_id, payment_date, amount, notes, created_at, sync_status, updated_at_local)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
+          [payment.id, userId, r.id, payment.payroll_id || null, payment.payment_date,
+           payment.amount, payment.notes || null, payment.created_at, payment.created_at || now]
+        )
+      }
     }
   },
 
@@ -1127,31 +1264,6 @@ export const sqliteHrService = {
   // Internal helpers — map DB rows ke typed objects
   // ============================================================
 
-  mapDepartment(r: any): Department {
-    return {
-      id: r.id,
-      user_id: r.user_id,
-      name: r.name,
-      description: r.description ?? undefined,
-      is_active: !!r.is_active,
-      created_at: r.created_at,
-      updated_at: r.updated_at,
-    }
-  },
-
-  mapPosition(r: any): Position {
-    return {
-      id: r.id,
-      user_id: r.user_id,
-      department_id: r.department_id ?? undefined,
-      name: r.name,
-      base_salary: r.base_salary,
-      is_active: !!r.is_active,
-      created_at: r.created_at,
-      updated_at: r.updated_at,
-    }
-  },
-
   mapEmployee(r: any): Employee {
     return {
       id: r.id,
@@ -1166,8 +1278,7 @@ export const sqliteHrService = {
       address: r.address ?? undefined,
       identity_type: r.identity_type ?? undefined,
       identity_number: r.identity_number ?? undefined,
-      department_id: r.department_id ?? undefined,
-      position_id: r.position_id ?? undefined,
+      position: r.position ?? undefined,
       join_date: r.join_date ?? undefined,
       resign_date: r.resign_date ?? undefined,
       status: r.status,
@@ -1208,7 +1319,7 @@ export const sqliteHrService = {
       amount: r.amount,
       is_percentage: !!r.is_percentage,
       apply_to: r.apply_to,
-      position_id: r.position_id ?? undefined,
+      position: r.position ?? undefined,
       employee_id: r.employee_id ?? undefined,
       is_active: !!r.is_active,
       created_at: r.created_at,
@@ -1263,6 +1374,33 @@ export const sqliteHrService = {
       component_name: r.component_name,
       component_type: r.component_type,
       amount: r.amount,
+      created_at: r.created_at,
+    }
+  },
+
+  mapEmployeeLoan(r: any): EmployeeLoan {
+    return {
+      id: r.id,
+      user_id: r.user_id,
+      employee_id: r.employee_id,
+      loan_date: r.loan_date,
+      amount: r.amount,
+      remaining_amount: r.remaining_amount,
+      description: r.description ?? undefined,
+      status: r.status,
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+    }
+  },
+
+  mapEmployeeLoanPayment(r: any): EmployeeLoanPayment {
+    return {
+      id: r.id,
+      loan_id: r.loan_id,
+      payroll_id: r.payroll_id ?? undefined,
+      payment_date: r.payment_date,
+      amount: r.amount,
+      notes: r.notes ?? undefined,
       created_at: r.created_at,
     }
   },

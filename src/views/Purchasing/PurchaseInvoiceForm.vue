@@ -12,27 +12,42 @@
         <div class="space-y-3">
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Goods Receipt (opsional)</label>
-            <select v-model="selectedGRNId" @change="onGRNSelect" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option :value="null">Faktur baru (tanpa referensi)</option>
-              <option v-for="g in completedGRNs" :key="g.id" :value="g.id">{{ g.grn_number }} — {{ g.supplier_name || 'Tanpa supplier' }}</option>
-            </select>
+            <SelectField
+              v-model="selectedGRNId"
+              :options="[
+                { label: 'Faktur baru (tanpa referensi)', value: null },
+                ...completedGRNs.map((g) => ({ label: `${g.grn_number} — ${g.supplier_name || 'Tanpa supplier'}`, value: g.id }))
+              ]"
+              title="Pilih Goods Receipt"
+              placeholder="Faktur baru (tanpa referensi)"
+              searchable
+              search-placeholder="Cari GRN..."
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              @change="onGRNSelect"
+            />
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Supplier *</label>
-              <select v-model="form.supplier_id" :disabled="!!selectedGRNId" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm disabled:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-900">
-                <option :value="null">Pilih supplier...</option>
-                <option v-for="s in store.suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
-              </select>
+              <SelectField
+                v-model="form.supplier_id"
+                :options="store.suppliers.map((s) => ({ label: s.name, value: s.id }))"
+                title="Pilih Supplier"
+                placeholder="Pilih supplier..."
+                searchable
+                search-placeholder="Cari supplier..."
+                :disabled="!!selectedGRNId"
+                button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 disabled:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-900"
+              />
             </div>
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tanggal Faktur *</label>
-              <input v-model="form.invoice_date" type="date" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+              <DateField v-model="form.invoice_date" title="Tanggal Faktur" button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
             </div>
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Jatuh Tempo</label>
-            <input v-model="form.due_date" type="date" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+            <DateField v-model="form.due_date" title="Jatuh Tempo" button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
           </div>
         </div>
       </div>
@@ -116,6 +131,8 @@ import AdminLayout from '@/components/layout/AdminLayout.vue'
 import CurrencyInput from '@/components/common/CurrencyInput.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DateField from '@/components/common/DateField.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { usePurchasingStore } from '@/stores/purchasing'
 import type { PurchaseInvoiceInput } from '@/types/database'
 

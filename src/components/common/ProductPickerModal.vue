@@ -62,27 +62,13 @@
 
               <!-- Category Filter -->
               <div class="relative z-20">
-                <select
+                <SelectField
                   v-model="selectedCategory"
-                  class="h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pr-11 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
-                >
-                  <option value="" class="bg-white text-gray-800 dark:bg-gray-900 dark:text-white/90">
-                    Semua Kategori
-                  </option>
-                  <option
-                    v-for="cat in categoryOptions"
-                    :key="cat.value"
-                    :value="cat.value"
-                    class="bg-white text-gray-800 dark:bg-gray-900 dark:text-white/90"
-                  >
-                    {{ cat.label }}
-                  </option>
-                </select>
-                <span class="absolute right-4 top-1/2 z-30 -translate-y-1/2 pointer-events-none text-gray-500 dark:text-gray-400">
-                  <svg class="stroke-current" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path d="M4.79175 7.396L10.0001 12.6043L15.2084 7.396" stroke="" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </span>
+                  :options="[{ label: 'Semua Kategori', value: '' }, ...categoryOptions]"
+                  title="Kategori Produk"
+                  placeholder="Semua Kategori"
+                  button-class="flex h-11 w-full items-center justify-between rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                />
               </div>
             </div>
 
@@ -182,6 +168,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
+import SelectField from '@/components/common/SelectField.vue'
 
 interface ProductOption {
   id: string

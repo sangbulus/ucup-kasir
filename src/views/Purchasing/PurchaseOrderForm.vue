@@ -12,22 +12,24 @@
         <div class="space-y-3">
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Supplier</label>
-            <select
+            <SelectField
               v-model="form.supplier_id"
-              class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-            >
-              <option :value="null">Pilih supplier...</option>
-              <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
+              :options="suppliers.map((s) => ({ label: s.name, value: s.id }))"
+              title="Pilih Supplier"
+              placeholder="Pilih supplier..."
+              searchable
+              search-placeholder="Cari supplier..."
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tanggal PO *</label>
-              <input v-model="form.po_date" type="date" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+              <DateField v-model="form.po_date" title="Tanggal PO" button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
             </div>
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Estimasi Tiba</label>
-              <input v-model="form.expected_date" type="date" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+              <DateField v-model="form.expected_date" title="Perkiraan Tanggal Terima" button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
             </div>
           </div>
         </div>
@@ -52,16 +54,16 @@
         <div v-for="(item, idx) in form.items" :key="idx" class="mb-3 rounded-xl border border-gray-200 p-3 dark:border-gray-700">
           <div class="flex items-start justify-between gap-2">
             <div class="flex-1">
-              <select
+              <SelectField
                 v-model="item.product_id"
+                :options="products.map((p) => ({ label: `${p.name} — stok: ${p.stock}`, value: p.id }))"
+                title="Pilih Produk"
+                placeholder="Pilih produk..."
+                searchable
+                search-placeholder="Cari produk..."
+                button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 @change="onProductSelect(idx)"
-                class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              >
-                <option :value="null">Pilih produk...</option>
-                <option v-for="p in products" :key="p.id" :value="p.id">
-                  {{ p.name }} — stok: {{ p.stock }}
-                </option>
-              </select>
+              />
               <p v-if="item.product_name && !item.product_id" class="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
                 {{ item.product_name }}
               </p>
@@ -169,6 +171,8 @@ import AdminLayout from '@/components/layout/AdminLayout.vue'
 import CurrencyInput from '@/components/common/CurrencyInput.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DateField from '@/components/common/DateField.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { usePurchasingStore } from '@/stores/purchasing'
 import { useProductsStore } from '@/stores/products'
 import type { POItemInput, PurchaseOrderInput } from '@/types/database'

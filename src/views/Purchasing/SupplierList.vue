@@ -215,21 +215,33 @@
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tipe Supplier</label>
-              <select v-model="form.supplier_type" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                <option value="langsung">Langsung</option>
-                <option value="distributor">Distributor</option>
-                <option value="grosir">Grosir</option>
-                <option value="importir">Importir</option>
-              </select>
+              <SelectField
+                v-model="form.supplier_type"
+                :options="[
+                  { label: 'Langsung', value: 'langsung' },
+                  { label: 'Distributor', value: 'distributor' },
+                  { label: 'Grosir', value: 'grosir' },
+                  { label: 'Importir', value: 'importir' }
+                ]"
+                title="Tipe Supplier"
+                placeholder="Pilih tipe..."
+                button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
             </div>
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Termin Pembayaran</label>
-              <select v-model="form.payment_term" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                <option value="tunai">Tunai</option>
-                <option value="7">7 Hari</option>
-                <option value="14">14 Hari</option>
-                <option value="30">30 Hari</option>
-              </select>
+              <SelectField
+                v-model="form.payment_term"
+                :options="[
+                  { label: 'Tunai', value: 'tunai' },
+                  { label: '7 Hari', value: '7' },
+                  { label: '14 Hari', value: '14' },
+                  { label: '30 Hari', value: '30' }
+                ]"
+                title="Termin Pembayaran"
+                placeholder="Pilih termin..."
+                button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
             </div>
           </div>
           <div>
@@ -280,6 +292,7 @@ import { useToast } from '@/composables/useToast'
 import { ref, onMounted } from 'vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import CurrencyInput from '@/components/common/CurrencyInput.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import { usePurchasingStore } from '@/stores/purchasing'

@@ -34,26 +34,13 @@
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                 Kategori
               </label>
-              <div class="relative z-20 bg-transparent">
-                <select
-                  v-model="filters.category"
-                  class="h-11 w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 py-2.5 pr-11 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="">Semua Kategori</option>
-                  <option
-                    v-for="option in categoryOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
-                <span class="absolute right-4 top-1/2 z-30 -translate-y-1/2 pointer-events-none text-gray-700 dark:text-gray-400">
-                  <svg class="stroke-current" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path d="M4.79175 7.396L10.0001 12.6043L15.2084 7.396" stroke="" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </span>
-              </div>
+              <SelectField
+                v-model="filters.category"
+                :options="[{ label: 'Semua Kategori', value: '' }, ...categoryOptions]"
+                title="Kategori"
+                placeholder="Semua Kategori"
+                button-class="flex h-11 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
             </div>
 
             <!-- Status Filter -->
@@ -61,21 +48,17 @@
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                 Status
               </label>
-              <div class="relative z-20 bg-transparent">
-                <select
-                  v-model="filters.status"
-                  class="h-11 w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 py-2.5 pr-11 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="">Semua Status</option>
-                  <option value="Aktif">Aktif</option>
-                  <option value="Tidak Aktif">Tidak Aktif</option>
-                </select>
-                <span class="absolute right-4 top-1/2 z-30 -translate-y-1/2 pointer-events-none text-gray-700 dark:text-gray-400">
-                  <svg class="stroke-current" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path d="M4.79175 7.396L10.0001 12.6043L15.2084 7.396" stroke="" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </span>
-              </div>
+              <SelectField
+                v-model="filters.status"
+                :options="[
+                  { label: 'Semua Status', value: '' },
+                  { label: 'Aktif', value: 'Aktif' },
+                  { label: 'Tidak Aktif', value: 'Tidak Aktif' },
+                ]"
+                title="Status"
+                placeholder="Semua Status"
+                button-class="flex h-11 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
             </div>
 
             <!-- Stok Filter -->
@@ -83,22 +66,18 @@
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                 Stok
               </label>
-              <div class="relative z-20 bg-transparent">
-                <select
-                  v-model="filters.stock"
-                  class="h-11 w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 py-2.5 pr-11 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="">Semua Stok</option>
-                  <option value="high">Stok Tinggi (>10)</option>
-                  <option value="medium">Stok Sedang (1-10)</option>
-                  <option value="low">Stok Habis (0)</option>
-                </select>
-                <span class="absolute right-4 top-1/2 z-30 -translate-y-1/2 pointer-events-none text-gray-700 dark:text-gray-400">
-                  <svg class="stroke-current" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path d="M4.79175 7.396L10.0001 12.6043L15.2084 7.396" stroke="" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </span>
-              </div>
+              <SelectField
+                v-model="filters.stock"
+                :options="[
+                  { label: 'Semua Stok', value: '' },
+                  { label: 'Stok Tinggi (>10)', value: 'high' },
+                  { label: 'Stok Sedang (1-10)', value: 'medium' },
+                  { label: 'Stok Habis (0)', value: 'low' },
+                ]"
+                title="Stok"
+                placeholder="Semua Stok"
+                button-class="flex h-11 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
             </div>
           </div>
 
@@ -125,6 +104,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import SelectField from '@/components/common/SelectField.vue'
 
 interface FilterValues {
   category: string

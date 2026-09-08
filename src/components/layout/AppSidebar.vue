@@ -312,9 +312,8 @@ const menuGroups = [
         subItems: [
           { name: "Dashboard HR", path: "/hr", pro: false },
           { name: "Daftar Karyawan", path: "/hr/employees", pro: false },
-          { name: "Departemen", path: "/hr/departments", pro: false },
-          { name: "Jabatan", path: "/hr/positions", pro: false },
           { name: "Absensi", path: "/hr/attendance", pro: false },
+          { name: "Kasbon", path: "/hr/loans", pro: false },
           { name: "Payroll", path: "/hr/payroll", pro: false },
           { name: "Komponen Gaji", path: "/hr/payroll/components", pro: false },
         ],

@@ -6,6 +6,14 @@
     <MobilePageHeader title="Jurnal Umum" subtitle="Pencatatan Transaksi Keuangan" back-to="/quick-menu/keuangan">
       <template #actions>
         <button
+          @click="showFilterModal = true"
+          class="mr-2 flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.03]"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          </svg>
+        </button>
+        <button
           @click="router.push('/finance/journal/new')"
           class="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-500"
         >
@@ -18,7 +26,12 @@
 
     <!-- Desktop Header Action -->
     <div class="mb-4 hidden items-center justify-between md:flex">
-      <div></div>
+      <button
+        @click="showFilterModal = true"
+        class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+      >
+        Filter Periode
+      </button>
       <button
         @click="router.push('/finance/journal/new')"
         class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
@@ -61,6 +74,7 @@
     <div v-else class="space-y-3">
       <!-- Filter Chips -->
       <div class="flex items-center gap-2 overflow-x-auto pb-1">
+        <!-- Filter Status -->
         <button
           v-for="opt in statusOptions"
           :key="opt.value"
@@ -69,6 +83,24 @@
             'flex-shrink-0 rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors',
             statusFilter === opt.value
               ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
+              : 'border-gray-300 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+          ]"
+        >
+          {{ opt.label }}
+        </button>
+
+        <!-- Divider -->
+        <div class="h-6 w-px bg-gray-300 dark:bg-gray-700"></div>
+
+        <!-- Filter Periode Cepat -->
+        <button
+          v-for="opt in periodOptions"
+          :key="opt.value"
+          @click="applyQuickPeriod(opt.value)"
+          :class="[
+            'flex-shrink-0 rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors',
+            periodFilter === opt.value
+              ? 'border-emerald-500 bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
               : 'border-gray-300 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
           ]"
         >
@@ -145,6 +177,61 @@
         </div>
       </div>
     </div>
+
+    <!-- Filter Modal -->
+    <div
+      v-if="showFilterModal"
+      class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 md:items-center"
+      @click.self="showFilterModal = false"
+    >
+      <div class="w-full max-w-md rounded-t-3xl bg-white p-6 md:rounded-2xl dark:bg-gray-900" @click.stop>
+        <div class="mb-4 flex items-center justify-between">
+          <h3 class="text-lg font-bold text-gray-900 dark:text-white">Filter Periode</h3>
+          <button
+            @click="showFilterModal = false"
+            class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">Dari Tanggal</label>
+            <DateField
+              v-model="tempStartDate"
+              title="Tanggal Mulai"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">Sampai Tanggal</label>
+            <DateField
+              v-model="tempEndDate"
+              title="Tanggal Selesai"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+
+          <div class="flex gap-2 pt-2">
+            <button
+              @click="resetDateFilter"
+              class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              Reset
+            </button>
+            <button
+              @click="applyDateFilter"
+              class="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500"
+            >
+              Terapkan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </AdminLayout>
 </template>
 
@@ -154,23 +241,126 @@ import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DateField from '@/components/common/DateField.vue'
 import { useFinanceStore } from '@/stores/finance'
 import type { JournalEntry } from '@/types/database'
 
 const router = useRouter()
 const store = useFinanceStore()
 
-const statusFilter = ref<'semua' | 'posted' | 'void'>('semua')
+const statusFilter = ref<'semua' | 'posted'>('semua')
 const statusOptions = [
   { value: 'semua', label: 'Semua' },
   { value: 'posted', label: 'Posted' },
-  { value: 'void', label: 'Void' },
 ] as const
 
+const periodFilter = ref<string>('semua')
+const periodOptions = [
+  { value: 'semua', label: 'Semua' },
+  { value: 'hari-ini', label: 'Hari Ini' },
+  { value: 'minggu-ini', label: 'Minggu Ini' },
+  { value: 'bulan-ini', label: 'Bulan Ini' },
+  { value: 'bulan-lalu', label: 'Bulan Lalu' },
+] as const
+
+const showFilterModal = ref(false)
+const startDate = ref<string | undefined>(undefined)
+const endDate = ref<string | undefined>(undefined)
+const tempStartDate = ref('')
+const tempEndDate = ref('')
+
+const applyQuickPeriod = (period: string) => {
+  periodFilter.value = period
+
+  if (period === 'semua') {
+    startDate.value = undefined
+    endDate.value = undefined
+    return
+  }
+
+  // Gunakan zona waktu lokal (bukan UTC)
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = today.getMonth()
+  const day = today.getDate()
+
+  // Helper untuk format tanggal ke YYYY-MM-DD
+  const formatDate = (date: Date) => {
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
+  switch (period) {
+    case 'hari-ini':
+      startDate.value = formatDate(new Date(year, month, day))
+      endDate.value = formatDate(new Date(year, month, day))
+      break
+
+    case 'minggu-ini':
+      const dayOfWeek = today.getDay()
+      const startOfWeek = new Date(year, month, day - dayOfWeek)
+      const endOfWeek = new Date(year, month, day + (6 - dayOfWeek))
+      startDate.value = formatDate(startOfWeek)
+      endDate.value = formatDate(endOfWeek)
+      break
+
+    case 'bulan-ini':
+      startDate.value = formatDate(new Date(year, month, 1))
+      endDate.value = formatDate(new Date(year, month + 1, 0))
+      break
+
+    case 'bulan-lalu':
+      startDate.value = formatDate(new Date(year, month - 1, 1))
+      endDate.value = formatDate(new Date(year, month, 0))
+      break
+  }
+}
+
 const filteredJournals = computed(() => {
-  if (statusFilter.value === 'semua') return store.journals
-  return store.journals.filter((j) => j.status === statusFilter.value)
+  let journals = store.journals
+
+  // Filter berdasarkan status
+  if (statusFilter.value !== 'semua') {
+    journals = journals.filter((j) => j.status === statusFilter.value)
+  }
+
+  // Filter berdasarkan rentang tanggal
+  if (startDate.value || endDate.value) {
+    journals = journals.filter((j) => {
+      // Ambil hanya bagian tanggal (YYYY-MM-DD) untuk perbandingan
+      const entryDateStr = j.entry_date.split('T')[0]
+
+      if (startDate.value && entryDateStr < startDate.value) return false
+      if (endDate.value && entryDateStr > endDate.value) return false
+      return true
+    })
+  }
+
+  // Urutkan dari tanggal terbaru
+  return [...journals].sort((a, b) => {
+    const dateA = new Date(a.entry_date).getTime()
+    const dateB = new Date(b.entry_date).getTime()
+    return dateB - dateA
+  })
 })
+
+const applyDateFilter = () => {
+  startDate.value = tempStartDate.value || undefined
+  endDate.value = tempEndDate.value || undefined
+  periodFilter.value = 'semua' // Reset periode cepat saat apply manual
+  showFilterModal.value = false
+}
+
+const resetDateFilter = () => {
+  tempStartDate.value = ''
+  tempEndDate.value = ''
+  startDate.value = undefined
+  endDate.value = undefined
+  periodFilter.value = 'semua'
+  showFilterModal.value = false
+}
 
 const journalTotal = (j: JournalEntry) => {
   return (j.lines || []).reduce((sum, l) => sum + (l.debit || 0), 0)
@@ -187,7 +377,7 @@ const formatDate = (dateString: string) =>
   new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 
 const getStatusLabel = (status: string) => {
-  const labels: Record<string, string> = { posted: 'Posted', draft: 'Draft', void: 'Void' }
+  const labels: Record<string, string> = { posted: 'Posted', draft: 'Draft' }
   return labels[status] || status
 }
 
@@ -195,7 +385,6 @@ const getStatusBadge = (status: string) => {
   const badges: Record<string, string> = {
     posted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400',
     draft: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
-    void: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
   }
   return badges[status] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
 }
@@ -206,7 +395,6 @@ const getRefLabel = (ref: string) => {
     transaction: 'Penjualan',
     return: 'Retur',
     payment: 'Pembayaran',
-    void: 'Pembatalan',
   }
   return labels[ref] || ref
 }
@@ -217,7 +405,6 @@ const getRefBadge = (ref: string) => {
     transaction: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400',
     return: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
     payment: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
-    void: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400',
   }
   return badges[ref] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
 }

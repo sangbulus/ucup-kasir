@@ -503,32 +503,9 @@ export interface PurchaseReturnInput {
 // Modul HR & Payroll — Manajemen Karyawan
 // ============================================================
 
-export interface Department {
-  id: string
-  user_id?: string
-  name: string
-  description?: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
-export type DepartmentInsert = Omit<Department, 'id' | 'created_at' | 'updated_at'>
-export type DepartmentUpdate = Partial<DepartmentInsert>
-
-export interface Position {
-  id: string
-  user_id?: string
-  department_id?: string
-  name: string
-  base_salary: number
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
-export type PositionInsert = Omit<Position, 'id' | 'created_at' | 'updated_at'>
-export type PositionUpdate = Partial<PositionInsert>
+// Jabatan di sistem ini hanya 2 (teks tetap): 'supir' | 'loader'.
+// Master departemen/jabatan sudah dihapus — tidak ada tabel relasi lagi.
+export type PositionName = 'supir' | 'loader'
 
 export interface Employee {
   id: string
@@ -543,8 +520,7 @@ export interface Employee {
   address?: string
   identity_type?: string
   identity_number?: string
-  department_id?: string
-  position_id?: string
+  position?: PositionName | ''
   join_date?: string
   resign_date?: string
   status: 'aktif' | 'cuti' | 'nonaktif' | 'keluar'
@@ -558,8 +534,6 @@ export interface Employee {
   is_active: boolean
   created_at: string
   updated_at: string
-  department?: Department
-  position?: Position
 }
 
 export type EmployeeInsert = Omit<Employee, 'id' | 'created_at' | 'updated_at'>
@@ -595,13 +569,13 @@ export interface PayrollComponent {
   amount: number
   is_percentage: boolean
   apply_to: 'semua' | 'per_jabatan' | 'per_karyawan'
-  position_id?: string
+  /** 'supir' | 'loader' — berlaku bila apply_to = per_jabatan */
+  position?: PositionName | ''
   employee_id?: string
   is_active: boolean
   created_at: string
   updated_at: string
   /** Join opsional untuk tampilan (kolom "Berlaku") */
-  position?: { name: string } | null
   employee?: { name: string } | null
 }
 
@@ -668,6 +642,59 @@ export interface PayrollSummary {
   total_gross: number
   total_deduction: number
   total_net: number
+}
+
+// ============================================================
+// Kasbon Karyawan (Employee Loans)
+// ============================================================
+
+export interface EmployeeLoan {
+  id: string
+  user_id?: string
+  employee_id: string
+  loan_date: string
+  amount: number
+  remaining_amount: number
+  description?: string
+  status: 'active' | 'paid' | 'cancelled'
+  created_at: string
+  updated_at: string
+  created_by?: string
+  updated_by?: string
+  employee?: Employee
+  payments?: EmployeeLoanPayment[]
+}
+
+export type EmployeeLoanInsert = Omit<EmployeeLoan, 'id' | 'created_at' | 'updated_at' | 'employee' | 'payments'>
+export type EmployeeLoanUpdate = Partial<EmployeeLoanInsert>
+
+export interface EmployeeLoanPayment {
+  id: string
+  loan_id: string
+  payroll_id?: string
+  payment_date: string
+  amount: number
+  notes?: string
+  created_at: string
+  created_by?: string
+  loan?: EmployeeLoan
+  payroll?: Payroll
+}
+
+export type EmployeeLoanPaymentInsert = Omit<EmployeeLoanPayment, 'id' | 'created_at' | 'loan' | 'payroll'>
+export type EmployeeLoanPaymentUpdate = Partial<EmployeeLoanPaymentInsert>
+
+/**
+ * Pilihan potongan kasbon per karyawan saat generate payroll.
+ * 'all' = potong semua sisa, 'half' = potong setengah, 'none' = jangan potong,
+ * string angka (mis. '500000') = potong sesuai nominal.
+ */
+export type KasbonChoice = 'all' | 'half' | 'none' | (string & {})
+
+/** Hasil RPC apply_kasbon_deductions */
+export interface KasbonDeductionResult {
+  applied_count: number
+  applied_amount: number
 }
 
 // ============================================================
@@ -749,6 +776,7 @@ export interface DeliveryOrder {
   vehicle_id?: string
   driver_id?: string
   driver_name?: string
+  driver_fee?: number
   notes?: string
   status: 'draft' | 'disiapkan' | 'dikirim' | 'selesai' | 'batal'
   created_at: string

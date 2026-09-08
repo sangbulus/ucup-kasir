@@ -127,13 +127,19 @@
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Metode</label>
-            <select v-model="payMethod" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="tunai">Tunai</option>
-              <option value="transfer">Transfer</option>
-              <option value="kartu_debit">Kartu Debit</option>
-              <option value="kartu_kredit">Kartu Kredit</option>
-              <option value="e_wallet">E-Wallet</option>
-            </select>
+            <SelectField
+              v-model="payMethod"
+              :options="[
+                { label: 'Tunai', value: 'tunai' },
+                { label: 'Transfer', value: 'transfer' },
+                { label: 'Kartu Debit', value: 'kartu_debit' },
+                { label: 'Kartu Kredit', value: 'kartu_kredit' },
+                { label: 'E-Wallet', value: 'e_wallet' }
+              ]"
+              title="Metode Pembayaran"
+              placeholder="Pilih metode..."
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Catatan</label>
@@ -158,6 +164,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import CurrencyInput from '@/components/common/CurrencyInput.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import { usePurchasingStore } from '@/stores/purchasing'

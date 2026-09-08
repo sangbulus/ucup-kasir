@@ -31,16 +31,21 @@
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tipe Kendaraan <span class="text-red-500">*</span></label>
-            <select v-model="form.vehicle_type" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="pickup">Pickup</option>
-              <option value="box">Box</option>
-              <option value="dump_truck">Dump Truck</option>
-              <option value="wingbox">Wingbox</option>
-              <option value="tronton">Tronton</option>
-              <option value="fuso">Fuso</option>
-              <option value="motor">Motor</option>
-              <option value="lainnya">Lainnya</option>
-            </select>
+            <SelectField
+              v-model="form.vehicle_type"
+              :options="[
+                { label: 'Pickup', value: 'pickup' },
+                { label: 'Box', value: 'box' },
+                { label: 'Dump Truck', value: 'dump_truck' },
+                { label: 'Wingbox', value: 'wingbox' },
+                { label: 'Tronton', value: 'tronton' },
+                { label: 'Fuso', value: 'fuso' },
+                { label: 'Motor', value: 'motor' },
+                { label: 'Lainnya', value: 'lainnya' },
+              ]"
+              title="Tipe Kendaraan"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Merek</label>
@@ -52,11 +57,16 @@
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Status</label>
-            <select v-model="form.status" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-              <option value="tersedia">Tersedia</option>
-              <option value="dipakai">Sedang Dipakai</option>
-              <option value="service">Service</option>
-            </select>
+            <SelectField
+              v-model="form.status"
+              :options="[
+                { label: 'Tersedia', value: 'tersedia' },
+                { label: 'Sedang Dipakai', value: 'dipakai' },
+                { label: 'Service', value: 'service' },
+              ]"
+              title="Status Kendaraan"
+              button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
           </div>
           <div class="flex items-center pt-6">
             <label class="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
@@ -139,6 +149,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useShippingStore } from '@/stores/shipping'
 
 const { confirm } = useConfirm()

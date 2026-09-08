@@ -436,18 +436,18 @@
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">Dari</label>
-                <input
-                  type="date"
+                <DateField
                   v-model="tempDateRange.start"
-                  class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  title="Tanggal Mulai"
+                  button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 />
               </div>
               <div>
                 <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">Sampai</label>
-                <input
-                  type="date"
+                <DateField
                   v-model="tempDateRange.end"
-                  class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  title="Tanggal Selesai"
+                  button-class="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 />
               </div>
             </div>
@@ -508,6 +508,7 @@ import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DateField from '@/components/common/DateField.vue'
 import { useSalesReportEnhancedStore } from '@/stores/salesReportEnhanced'
 import { useFinanceStore } from '@/stores/finance'
 

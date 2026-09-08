@@ -42,21 +42,6 @@
           <p class="text-[9px] text-emerald-600 dark:text-emerald-400">Absen: {{ stats.todayAbsent }}</p>
         </div>
 
-        <div class="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-3.5 shadow-sm dark:border-amber-500/30 dark:from-amber-500/10 dark:to-gray-900">
-          <div class="mb-2 flex items-center justify-between">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Departemen</span>
-            <div class="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500/20">
-              <svg class="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            </div>
-          </div>
-          <p class="mb-0.5 text-lg font-black leading-none text-gray-900 dark:text-white">{{ stats.departmentCount }}</p>
-          <button @click="router.push('/hr/departments')" class="mt-1 text-[9px] font-medium text-amber-700 underline hover:no-underline dark:text-amber-300">
-            Kelola →
-          </button>
-        </div>
-
         <div class="rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 to-white p-3.5 shadow-sm dark:border-purple-500/30 dark:from-purple-500/10 dark:to-gray-900">
           <div class="mb-2 flex items-center justify-between">
             <span class="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Beban Gaji</span>
@@ -74,7 +59,7 @@
       <!-- Quick Actions -->
       <div class="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
         <h3 class="mb-3 text-sm font-bold text-gray-900 dark:text-white">Aksi Cepat</h3>
-        <div class="grid grid-cols-2 gap-2 md:grid-cols-5">
+        <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
           <button @click="router.push('/hr/employees/add')" class="rounded-xl border border-gray-200 p-3 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
             <span class="mb-1 block text-base">👤</span>Tambah Karyawan
           </button>
@@ -86,9 +71,6 @@
           </button>
           <button @click="router.push('/hr/payroll/components')" class="rounded-xl border border-gray-200 p-3 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
             <span class="mb-1 block text-base">⚙️</span>Komponen Gaji
-          </button>
-          <button @click="router.push('/hr/departments')" class="rounded-xl border border-gray-200 p-3 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
-            <span class="mb-1 block text-base">🏢</span>Departemen
           </button>
         </div>
       </div>
@@ -119,7 +101,11 @@
             </div>
             <div class="flex-1 min-w-0">
               <p class="truncate text-xs font-medium text-gray-900 dark:text-white">{{ emp.name }}</p>
-              <p class="text-[9px] text-gray-500 dark:text-gray-400">{{ emp.employee_code }} · {{ emp.position?.name || 'Tanpa jabatan' }}</p>
+              <p class="text-[9px] text-gray-500 dark:text-gray-400">
+                {{ emp.employee_code }}
+                <span v-if="emp.position"> · <span class="capitalize">{{ emp.position }}</span></span>
+                <span v-else> · Tanpa jabatan</span>
+              </p>
             </div>
             <span class="rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase" :class="getStatusBadge(emp.status)">
               {{ emp.status }}
@@ -194,7 +180,6 @@ const stats = computed(() => {
     activeEmployees: active,
     todayPresent: present,
     todayAbsent: absent,
-    departmentCount: store.departments.length,
   }
 })
 
@@ -249,7 +234,6 @@ const formatCurrency = (value: number) =>
 onMounted(async () => {
   await Promise.all([
     store.fetchEmployees(),
-    store.fetchDepartments(),
     store.fetchAttendance(
       new Date().toISOString().split('T')[0],
       new Date().toISOString().split('T')[0]

@@ -34,14 +34,6 @@ export const DEFAULT_QUICK_MENU: QuickMenuItem[] = [
   },
   
   {
-    id: 'returns',
-    to: '/returns',
-    label: 'Retur',
-    description: 'Pengajuan & daftar retur penjualan',
-    iconClass: 'border-cyan-500/20 bg-cyan-500/10 text-cyan-500',
-    iconPath: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
-  },
-  {
     id: 'categories',
     to: '/categories',
     label: 'Kategori',
@@ -88,6 +80,14 @@ export const DEFAULT_QUICK_MENU: QuickMenuItem[] = [
     description: 'Rincian laba per transaksi penjualan',
     iconClass: 'border-cyan-500/20 bg-cyan-500/10 text-cyan-500',
     iconPath: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+  },
+  {
+    id: 'returns',
+    to: '/returns',
+    label: 'Retur',
+    description: 'Pengajuan & daftar retur penjualan',
+    iconClass: 'border-cyan-500/20 bg-cyan-500/10 text-cyan-500',
+    iconPath: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
   },
   {
     id: 'customers',
@@ -219,6 +219,14 @@ export const DEFAULT_QUICK_MENU: QuickMenuItem[] = [
     iconPath: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
   },
   {
+    id: 'shipping-pending',
+    to: '/shipping/pending-shipments',
+    label: 'Perlu Dikirim',
+    description: 'Transaksi yang belum dibuat surat jalan',
+    iconClass: 'border-sky-500/20 bg-sky-500/10 text-sky-500',
+    iconPath: 'M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4',
+  },
+  {
     id: 'shipping-deliveries',
     to: '/shipping/deliveries',
     label: 'Surat Jalan',
@@ -243,28 +251,20 @@ export const DEFAULT_QUICK_MENU: QuickMenuItem[] = [
     iconPath: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
   },
   {
-    id: 'hr-departments',
-    to: '/hr/departments',
-    label: 'Departemen',
-    description: 'Struktur departemen perusahaan',
-    iconClass: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500',
-    iconPath: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10',
-  },
-  {
-    id: 'hr-positions',
-    to: '/hr/positions',
-    label: 'Jabatan',
-    description: 'Data jabatan & level organisasi',
-    iconClass: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500',
-    iconPath: 'M12 4.5a3.5 3.5 0 00-3.5 3.5c0 1.414.583 2.743 1.607 3.682A6 6 0 006 16h12a6 6 0 00-4.107-4.318c1.024-.939 1.607-2.268 1.607-3.682A3.5 3.5 0 0012 4.5zM8 19h8',
-  },
-  {
     id: 'hr-attendance',
     to: '/hr/attendance',
     label: 'Absensi',
     description: 'Rekap kehadiran & izin karyawan',
     iconClass: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500',
     iconPath: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zm6-8l2 2 4-4',
+  },
+  {
+    id: 'hr-loans',
+    to: '/hr/loans',
+    label: 'Kasbon',
+    description: 'Kasbon karyawan & pemotongan gaji',
+    iconClass: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500',
+    iconPath: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z',
   },
   {
     id: 'hr-payroll',
@@ -348,14 +348,14 @@ export const GROUP_MAP: Record<string, string> = {
   'purchasing-returns': 'Pembelian',
   // Pengiriman
   shipping: 'Pengiriman',
+  'shipping-pending': 'Pengiriman',
   'shipping-deliveries': 'Pengiriman',
   'shipping-vehicles': 'Pengiriman',
   // Karyawan & Payroll
   hr: 'Karyawan & Payroll',
   'hr-employees': 'Karyawan & Payroll',
-  'hr-departments': 'Karyawan & Payroll',
-  'hr-positions': 'Karyawan & Payroll',
   'hr-attendance': 'Karyawan & Payroll',
+  'hr-loans': 'Karyawan & Payroll',
   'hr-payroll': 'Karyawan & Payroll',
   'hr-payroll-components': 'Karyawan & Payroll',
 }
@@ -390,14 +390,14 @@ export const SUBGROUP_MAP: Record<string, string> = {
   'purchasing-returns': 'Transaksi Pembelian',
   // Pengiriman
   shipping: 'Ringkasan',
+  'shipping-pending': 'Operasional',
   'shipping-deliveries': 'Operasional',
   'shipping-vehicles': 'Operasional',
   // Karyawan & Payroll
   hr: 'Ringkasan',
   'hr-employees': 'Master Data',
-  'hr-departments': 'Master Data',
-  'hr-positions': 'Master Data',
   'hr-attendance': 'Absensi & Payroll',
+  'hr-loans': 'Absensi & Payroll',
   'hr-payroll': 'Absensi & Payroll',
   'hr-payroll-components': 'Absensi & Payroll',
 }
