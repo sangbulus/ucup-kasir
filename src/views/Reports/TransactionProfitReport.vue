@@ -261,11 +261,16 @@ import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DateField from '@/components/common/DateField.vue'
 import SelectField from '@/components/common/SelectField.vue'
 import { useSalesReportEnhancedStore } from '@/stores/salesReportEnhanced'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 
 const router = useRouter()
 const store = useSalesReportEnhancedStore()
 
 const showFilter = ref(false)
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showFilter, 'transaction-profit-filter-modal')
+
 const activePreset = ref('')
 const tempStart = ref('')
 const tempEnd = ref('')

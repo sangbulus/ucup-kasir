@@ -14,6 +14,7 @@ import VueApexCharts from 'vue3-apexcharts'
 import { App as CapacitorApp } from '@capacitor/app'
 import { initSQLite } from '@/lib/sqlite'
 import { isNativeApp } from '@/lib/platform'
+import { useNavigationStack } from '@/composables/useNavigationStack'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -70,14 +71,17 @@ async function startup() {
 
 startup()
 
-// Handle Android back button
-CapacitorApp.addListener('backButton', ({ canGoBack }) => {
-  if (!canGoBack || router.currentRoute.value.path === '/') {
-    // Jika di halaman home atau tidak bisa back, keluar dari aplikasi
-    CapacitorApp.exitApp()
-  } else {
-    // Navigasi back menggunakan router Vue
-    router.back()
+// Handle Android back button dengan navigation stack
+const { handleBackButton } = useNavigationStack()
+
+CapacitorApp.addListener('backButton', async () => {
+  const handled = await handleBackButton()
+
+  if (!handled) {
+    // Jika tidak ada layer di stack dan tidak bisa back lagi, keluar dari aplikasi
+    if (router.currentRoute.value.path === '/' || !router.options.history.state.back) {
+      CapacitorApp.exitApp()
+    }
   }
 })
 

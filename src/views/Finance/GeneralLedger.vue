@@ -332,6 +332,7 @@ import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DateField from '@/components/common/DateField.vue'
 import SelectField from '@/components/common/SelectField.vue'
 import { useFinanceStore } from '@/stores/finance'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import type { Account } from '@/types/database'
 
 const router = useRouter()
@@ -346,6 +347,10 @@ const ledger = ref<any>({ balance: 0, entries: [] })
 
 const showAccountModal = ref(false)
 const showFilterModal = ref(false)
+
+// Auto register/unregister modals di navigation stack
+useAutoNavigationStack(showAccountModal, 'general-ledger-account-modal')
+useAutoNavigationStack(showFilterModal, 'general-ledger-filter-modal')
 
 // Date filter state
 const startDate = ref<string | undefined>(undefined)

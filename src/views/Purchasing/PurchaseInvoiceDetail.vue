@@ -160,6 +160,7 @@
 
 <script setup lang="ts">
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
@@ -182,6 +183,9 @@ const formError = ref<string | null>(null)
 const showPayModal = ref(false)
 const payAmount = ref(0)
 const payMethod = ref('tunai')
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showPayModal, 'purchase-invoice-payment-modal')
 const payNotes = ref('')
 
 const formatRupiah = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n || 0)

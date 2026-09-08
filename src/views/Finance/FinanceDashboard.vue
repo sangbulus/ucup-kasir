@@ -296,16 +296,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DateField from '@/components/common/DateField.vue'
 import { useFinanceStore } from '@/stores/finance'
+import { useNavigationStack } from '@/composables/useNavigationStack'
 
 const router = useRouter()
 const store = useFinanceStore()
+const { registerModal, unregisterModal } = useNavigationStack()
 
 const showFilterModal = ref(false)
 const tempRange = ref('thisMonth')
@@ -420,6 +422,17 @@ const formatCurrency = (value: number) =>
 
 const formatDateTime = (dateString: string) =>
   new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+
+// Register/unregister modal di navigation stack
+watch(showFilterModal, (isOpen) => {
+  if (isOpen) {
+    registerModal('finance-filter-modal', () => {
+      showFilterModal.value = false
+    })
+  } else {
+    unregisterModal('finance-filter-modal')
+  }
+})
 
 onMounted(async () => {
   // Default: bulan ini

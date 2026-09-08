@@ -765,6 +765,7 @@ import { useReturnsStore } from '@/stores/returns'
 import { useCustomersStore } from '@/stores/customers'
 import { useStoreSettingsStore } from '@/stores/storeSettings'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import { usePdfExport } from '@/composables/usePdfExport'
 
 const router = useRouter()
@@ -783,6 +784,12 @@ const showDeleteDialog = ref(false)
 const showPaymentModal = ref(false)
 const showReturnModal = ref(false)
 const showDeleteReturnDialog = ref(false)
+
+// Auto register/unregister layer di navigation stack
+useAutoNavigationStack(showDeleteDialog, 'transaction-delete-dialog')
+useAutoNavigationStack(showPaymentModal, 'transaction-payment-modal')
+useAutoNavigationStack(showReturnModal, 'transaction-return-modal')
+useAutoNavigationStack(showDeleteReturnDialog, 'transaction-delete-return-dialog')
 const returnToDelete = ref<any>(null)
 const isGeneratingPdf = ref(false)
 

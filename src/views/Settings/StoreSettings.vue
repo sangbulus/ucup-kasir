@@ -1079,6 +1079,7 @@ import { useStoreSettingsStore } from '@/stores/storeSettings'
 import { useAuthStore } from '@/stores/auth'
 import { useSyncStore } from '@/stores/sync'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import { useTheme } from '@/components/layout/ThemeProvider.vue'
 import { useNetwork } from '@/lib/network'
 import BackupStatus from '@/views/Sync/BackupStatus.vue'
@@ -1105,6 +1106,9 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const syncError = ref<string | null>(null)
 const lastSyncLabel = ref<string | null>(null)
 const showLogoutConfirm = ref(false)
+
+// Auto register/unregister layer di navigation stack
+useAutoNavigationStack(showLogoutConfirm, 'settings-logout-confirm-dialog')
 
 // State untuk sinkronisasi
 const syncing = ref(false)

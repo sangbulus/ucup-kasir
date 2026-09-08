@@ -497,6 +497,7 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useStoreSettingsStore } from '@/stores/storeSettings'
 import { useStockStore } from '@/stores/stock'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 
 const router = useRouter()
 const productsStore = useProductsStore()
@@ -508,6 +509,11 @@ const toast = useToast()
 const showAdjustmentModal = ref(false)
 const showOpnameModal = ref(false)
 const showMinimumStockModal = ref(false)
+
+// Auto register/unregister modals di navigation stack
+useAutoNavigationStack(showAdjustmentModal, 'stock-adjustment-modal')
+useAutoNavigationStack(showOpnameModal, 'stock-opname-modal')
+useAutoNavigationStack(showMinimumStockModal, 'stock-minimum-modal')
 const selectedProduct = ref<any>(null)
 const minimumStockValue = ref(10)
 const filters = ref({ category: '', status: '', stock: '' })
@@ -515,6 +521,7 @@ const filters = ref({ category: '', status: '', stock: '' })
 // Mobile: bottom sheet aksi per produk
 const showProductMenu = ref(false)
 const menuProduct = ref<any>(null)
+useAutoNavigationStack(showProductMenu, 'stock-product-menu-sheet')
 const openProductMenu = (product: any) => {
   menuProduct.value = product
   showProductMenu.value = true

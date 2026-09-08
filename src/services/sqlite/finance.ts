@@ -263,7 +263,9 @@ export const sqliteFinanceService = {
       }
     }).then(async () => {
       const entry = await this.getJournal(journalId)
-      await addToSyncQueue('INSERT', 'journal_entries', journalId, { id: journalId })
+      if (entry) {
+        await addToSyncQueue('INSERT', 'journal_entries', journalId, entry)
+      }
       return journalId
     })
   },
@@ -505,7 +507,10 @@ export const sqliteFinanceService = {
     const hpp = accMap['5-5000']
     const persediaan = accMap['1-1200']
 
+    // Validasi: semua akun yang dibutuhkan harus ada
     if (!kas || !pendapatan) return null // COA belum di-seed
+    if (remainingAmount > 0 && !piutang) return null // Piutang dibutuhkan tapi tidak ada
+    if (totalCogs > 0 && (!hpp || !persediaan)) return null // HPP/Persediaan dibutuhkan tapi tidak ada
 
     // Simpan header jurnal
     await tx.run(
@@ -524,11 +529,11 @@ export const sqliteFinanceService = {
     }
 
     // Baris: Piutang (debit)
-    if (remainingAmount > 0) {
+    if (remainingAmount > 0 && piutang) {
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, piutang?.id, '1-1100', 'Piutang Usaha', remainingAmount, now, now]
+        [uuid(), userId, journalId, piutang.id, '1-1100', 'Piutang Usaha', remainingAmount, now, now]
       )
     }
 
@@ -590,13 +595,13 @@ export const sqliteFinanceService = {
 
     await tx.run(
       `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
-       VALUES (?, ?, ?, ?, 'Kas', ?, ?, 0, ?, 'pending', ?)`,
-      [uuid(), userId, journalId, kas.id, paymentAmount, now, now]
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'pending', ?)`,
+      [uuid(), userId, journalId, kas.id, '1-1000', 'Kas', paymentAmount, now, now]
     )
     await tx.run(
       `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
-       VALUES (?, ?, ?, ?, 'Piutang Usaha', ?, 0, ?, ?, 'pending', ?)`,
-      [uuid(), userId, journalId, piutang.id, paymentAmount, now, now]
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'pending', ?)`,
+      [uuid(), userId, journalId, piutang.id, '1-1100', 'Piutang Usaha', paymentAmount, now, now]
     )
 
     return journalId
@@ -634,7 +639,11 @@ export const sqliteFinanceService = {
     const hpp = accMap['5-5000']
     const persediaan = accMap['1-1200']
 
+    // Validasi: akun yang dibutuhkan harus ada
     if (!pendapatan) return null
+    if (paidAmount > 0 && !kas) return null
+    if (remainingAmount > 0 && !piutang) return null
+    if (totalCogsReturned > 0 && (!hpp || !persediaan)) return null
 
     await tx.run(
       `INSERT INTO journal_entries (id, user_id, journal_number, entry_date, description, reference_type, reference_id, status, created_at, updated_at, sync_status, updated_at_local)

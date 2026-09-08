@@ -359,6 +359,7 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useProductsStore } from '@/stores/products'
 import { useStoreSettingsStore } from '@/stores/storeSettings'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import {
   downloadCsv,
   parseCsv,
@@ -377,6 +378,11 @@ const selectAllCheckbox = ref<HTMLInputElement | null>(null)
 const showDeleteDialog = ref(false)
 const showBulkDeleteDialog = ref(false)
 const showImportModal = ref(false)
+
+// Auto register/unregister layer di navigation stack
+useAutoNavigationStack(showDeleteDialog, 'category-delete-dialog')
+useAutoNavigationStack(showBulkDeleteDialog, 'category-bulk-delete-dialog')
+useAutoNavigationStack(showImportModal, 'category-import-modal')
 const categoryToDelete = ref<any>(null)
 
 // Mobile states

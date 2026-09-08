@@ -270,6 +270,7 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import LoadingSkeleton from '@/components/common/LoadingSkeleton.vue'
 import { useProductsStore } from '@/stores/products'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 
 const router = useRouter()
 const route = useRoute()
@@ -280,6 +281,9 @@ const productId = route.params.id as string
 const product = ref<any>(null)
 const loading = ref(true)
 const showDeleteDialog = ref(false)
+
+// Auto register/unregister layer di navigation stack
+useAutoNavigationStack(showDeleteDialog, 'product-detail-delete-dialog')
 
 const formatNumber = (num: number) => {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')

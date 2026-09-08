@@ -350,6 +350,7 @@ import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DataTable from '@/components/tables/DataTable.vue'
 import { useReturnsStore } from '@/stores/returns'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 
 const router = useRouter()
 const returnsStore = useReturnsStore()
@@ -361,6 +362,9 @@ const itemsPerPage = ref(10)
 const searchQuery = ref('')
 const sortBy = ref<'newest' | 'oldest' | 'highest' | 'lowest'>('newest')
 const showSortModal = ref(false)
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showSortModal, 'return-list-sort-modal')
 
 // Filter logic
 const filteredReturns = computed(() => {

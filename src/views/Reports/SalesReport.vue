@@ -243,11 +243,15 @@ import DateField from '@/components/common/DateField.vue'
 import SelectField from '@/components/common/SelectField.vue'
 import { useSalesReportStore } from '@/stores/salesReport'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 
 const reportStore = useSalesReportStore()
 const toast = useToast()
 const activePreset = ref('today')
 const showFilterModal = ref(false)
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showFilterModal, 'sales-report-filter-modal')
 
 // Status pembayaran (temp state untuk modal)
 const tempPaymentStatus = ref<'lunas' | 'belum_lunas' | 'all'>('all')

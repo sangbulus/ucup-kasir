@@ -195,6 +195,7 @@ import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DateField from '@/components/common/DateField.vue'
 import { useFinanceStore } from '@/stores/finance'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import type { AccountBalance } from '@/types/database'
 
 const router = useRouter()
@@ -203,6 +204,9 @@ const store = useFinanceStore()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const showFilterModal = ref(false)
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showFilterModal, 'trial-balance-filter-modal')
 
 const endDate = ref<string | undefined>(undefined)
 const tempEnd = ref('')

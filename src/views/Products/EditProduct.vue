@@ -252,6 +252,7 @@ import SelectField from '@/components/common/SelectField.vue'
 import { useProductsStore } from '@/stores/products'
 import { useCategoriesStore } from '@/stores/categories'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 
 const router = useRouter()
 const route = useRoute()
@@ -263,6 +264,9 @@ const productId = route.params.id as string
 const product = ref<any>(null)
 const loading = ref(true)
 const showConfirmDialog = ref(false)
+
+// Auto register/unregister layer di navigation stack
+useAutoNavigationStack(showConfirmDialog, 'edit-product-confirm-dialog')
 const isSubmitting = ref(false)
 const showNewCategoryInput = ref(false)
 const newCategoryName = ref('')

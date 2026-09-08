@@ -112,6 +112,7 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { useCategoriesStore } from '@/stores/categories'
 import { useProductsStore } from '@/stores/products'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 
 const router = useRouter()
 const route = useRoute()
@@ -123,6 +124,9 @@ const categoryId = route.params.id as string
 const category = ref<any>(null)
 const loading = ref(true)
 const showDeleteDialog = ref(false)
+
+// Auto register/unregister layer di navigation stack
+useAutoNavigationStack(showDeleteDialog, 'category-detail-delete-dialog')
 
 const productCount = computed(() => {
   return productsStore.products.filter(p => p.category_id === categoryId).length

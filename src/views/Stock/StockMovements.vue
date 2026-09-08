@@ -428,6 +428,7 @@ import SelectField from '@/components/common/SelectField.vue'
 import { useProductsStore } from '@/stores/products'
 import { useStockStore } from '@/stores/stock'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 
 const router = useRouter()
 const route = useRoute()
@@ -448,6 +449,9 @@ const itemsPerPage = ref(10)
 
 const showDetailModal = ref(false)
 const selectedMovement = ref<any>(null)
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showDetailModal, 'stock-movements-detail-modal')
 
 const columns = [
   { key: 'created_at', label: 'TANGGAL', sortable: true, format: 'date' as const, width: 'w-2/12' },

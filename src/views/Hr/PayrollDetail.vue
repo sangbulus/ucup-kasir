@@ -252,6 +252,7 @@
 <script setup lang="ts">
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
@@ -317,6 +318,9 @@ const KASBON_OPTIONS = [
 ] as const
 
 const showKasbonModal = ref(false)
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showKasbonModal, 'payroll-kasbon-modal')
 /** employee_id → 'all' | 'half' | 'custom' | 'none' */
 const kasbonChoices = reactive<Record<string, string>>({})
 /** employee_id → angka nominal custom (string dari input) */

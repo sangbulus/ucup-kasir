@@ -218,17 +218,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DateField from '@/components/common/DateField.vue'
 import { useFinanceStore } from '@/stores/finance'
+import { useNavigationStack } from '@/composables/useNavigationStack'
 import type { AccountBalance } from '@/types/database'
 
 const router = useRouter()
 const store = useFinanceStore()
+const { registerModal, unregisterModal } = useNavigationStack()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -305,6 +307,17 @@ const resetFilter = () => {
   showFilterModal.value = false
   fetchData()
 }
+
+// Register/unregister modal di navigation stack
+watch(showFilterModal, (isOpen) => {
+  if (isOpen) {
+    registerModal('balance-sheet-filter-modal', () => {
+      showFilterModal.value = false
+    })
+  } else {
+    unregisterModal('balance-sheet-filter-modal')
+  }
+})
 
 onMounted(fetchData)
 </script>

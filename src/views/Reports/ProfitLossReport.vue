@@ -511,6 +511,7 @@ import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DateField from '@/components/common/DateField.vue'
 import { useSalesReportEnhancedStore } from '@/stores/salesReportEnhanced'
 import { useFinanceStore } from '@/stores/finance'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 
 const router = useRouter()
 const store = useSalesReportEnhancedStore()
@@ -518,6 +519,9 @@ const financeStore = useFinanceStore()
 
 const showFilterModal = ref(false)
 const showBreakdown = ref(false)
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showFilterModal, 'profit-loss-filter-modal')
 
 // Saldo beban operasional per akun (dari jurnal, modul finance)
 const expenseBalanceByAccount = ref<Record<string, number>>({})

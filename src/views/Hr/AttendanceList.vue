@@ -175,6 +175,7 @@
 <script setup lang="ts">
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import { ref, reactive, computed, onMounted } from 'vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
@@ -200,6 +201,9 @@ const filterDate = ref(localToday())
 const filterStatus = ref('')
 const showModal = ref(false)
 const editAttId = ref<string | null>(null)
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showModal, 'attendance-add-modal')
 
 const defaultForm = () => ({
   employee_id: '',

@@ -710,6 +710,7 @@ import { useCustomersStore } from '@/stores/customers'
 import { useStoreSettingsStore } from '@/stores/storeSettings'
 import { sqliteTransactionsService } from '@/services/sqlite/transactions'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import type { Transaction } from '@/types/database'
 
 const router = useRouter()
@@ -737,6 +738,9 @@ const transactions = ref<Transaction[]>([])
 const loadingTransactions = ref(false)
 const showFilters = ref(false)
 const showFilterModal = ref(false)
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showFilterModal, 'customer-detail-filter-modal')
 
 // Filter state
 const filters = ref({

@@ -381,6 +381,7 @@ import { useProductsStore } from '@/stores/products'
 import { useCategoriesStore } from '@/stores/categories'
 import { useStoreSettingsStore } from '@/stores/storeSettings'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import {
   downloadCsv,
   parseCsv,
@@ -402,6 +403,12 @@ const showFilterModal = ref(false)
 const showDeleteDialog = ref(false)
 const showBulkDeleteDialog = ref(false)
 const showImportModal = ref(false)
+
+// Auto register/unregister layer di navigation stack
+useAutoNavigationStack(showFilterModal, 'product-list-filter-modal')
+useAutoNavigationStack(showDeleteDialog, 'product-delete-dialog')
+useAutoNavigationStack(showBulkDeleteDialog, 'product-bulk-delete-dialog')
+useAutoNavigationStack(showImportModal, 'product-import-modal')
 const productToDelete = ref<any>(null)
 const filters = ref({ category: '', status: '', stock: '' })
 const statusFilter = ref('')

@@ -299,6 +299,7 @@
 <script setup lang="ts">
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import { ref, computed, onMounted } from 'vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
@@ -316,6 +317,9 @@ const editingId = ref<string | null>(null)
 const saving = ref(false)
 const formError = ref<string | null>(null)
 const typeFilter = ref<'semua' | Account['type']>('semua')
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showAddModal, 'chart-of-accounts-add-modal')
 
 const typeOptions = [
   { value: 'semua', label: 'Semua' },

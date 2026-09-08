@@ -324,7 +324,9 @@ export const sqliteTransactionsService = {
       // Queue jurnal otomatis (header + lines) agar ikut tersinkron
       if (autoJournalId) {
         const journal = await sqliteFinanceService.getJournal(autoJournalId)
-        await addToSyncQueue('INSERT', 'journal_entries', autoJournalId, journal || { id: autoJournalId })
+        if (journal) {
+          await addToSyncQueue('INSERT', 'journal_entries', autoJournalId, journal)
+        }
       }
       return txnId
     })
@@ -414,7 +416,9 @@ export const sqliteTransactionsService = {
     // Queue jurnal pembayaran
     if (autoJournalId) {
       const journal = await sqliteFinanceService.getJournal(autoJournalId)
-      await addToSyncQueue('INSERT', 'journal_entries', autoJournalId, journal || { id: autoJournalId })
+      if (journal) {
+        await addToSyncQueue('INSERT', 'journal_entries', autoJournalId, journal)
+      }
     }
 
     return paymentId

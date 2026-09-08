@@ -214,6 +214,7 @@ import StockAdjustmentModal from './StockAdjustmentModal.vue'
 import { useProductsStore } from '@/stores/products'
 import { useStockStore } from '@/stores/stock'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import type { StockMovement } from '@/services/sqlite/stock'
 
 const router = useRouter()
@@ -225,6 +226,9 @@ const toast = useToast()
 const productId = route.params.id as string
 const loading = ref(true)
 const showAdjustmentModal = ref(false)
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showAdjustmentModal, 'stock-detail-adjustment-modal')
 const movements = ref<StockMovement[]>([])
 
 const product = computed(() =>

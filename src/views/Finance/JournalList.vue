@@ -243,6 +243,7 @@ import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DateField from '@/components/common/DateField.vue'
 import { useFinanceStore } from '@/stores/finance'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import type { JournalEntry } from '@/types/database'
 
 const router = useRouter()
@@ -268,6 +269,9 @@ const startDate = ref<string | undefined>(undefined)
 const endDate = ref<string | undefined>(undefined)
 const tempStartDate = ref('')
 const tempEndDate = ref('')
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showFilterModal, 'journal-list-filter-modal')
 
 const applyQuickPeriod = (period: string) => {
   periodFilter.value = period

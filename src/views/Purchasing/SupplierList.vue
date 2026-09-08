@@ -289,6 +289,7 @@
 <script setup lang="ts">
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import { ref, onMounted } from 'vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import CurrencyInput from '@/components/common/CurrencyInput.vue'
@@ -306,6 +307,9 @@ const showModal = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
 const formError = ref<string | null>(null)
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showModal, 'supplier-add-modal')
 
 const form = ref<SupplierInsert>({
   name: '',

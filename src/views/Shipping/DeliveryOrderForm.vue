@@ -231,6 +231,7 @@
 
 <script setup lang="ts">
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
@@ -285,6 +286,11 @@ const loaders = ref<Array<{ employee_id: string; employee_name: string }>>([])
 const loaderToAdd = ref('')
 const showTransactionDialog = ref(false)
 const showProductDialog = ref(false)
+
+// Auto register/unregister layer di navigation stack
+useAutoNavigationStack(showDatePicker, 'delivery-date-picker-modal')
+useAutoNavigationStack(showTransactionDialog, 'delivery-transaction-dialog')
+useAutoNavigationStack(showProductDialog, 'delivery-product-dialog')
 
 const driverOptions = computed(() =>
   (hr.employees || []).filter((e: any) => e.status === 'aktif').map((e: any) => ({ id: e.id, name: e.name }))

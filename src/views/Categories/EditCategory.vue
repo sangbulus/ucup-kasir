@@ -89,6 +89,7 @@ import ComponentCard from '@/components/common/ComponentCard.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { useCategoriesStore } from '@/stores/categories'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 
 const router = useRouter()
 const route = useRoute()
@@ -99,6 +100,9 @@ const categoryId = route.params.id as string
 const category = ref<any>(null)
 const loading = ref(true)
 const showConfirmDialog = ref(false)
+
+// Auto register/unregister layer di navigation stack
+useAutoNavigationStack(showConfirmDialog, 'edit-category-confirm-dialog')
 const isSubmitting = ref(false)
 
 const formData = reactive({

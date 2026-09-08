@@ -279,11 +279,15 @@ import CurrencyInput from '@/components/common/CurrencyInput.vue'
 import KecamatanInput from '@/components/common/KecamatanInput.vue'
 import { useCustomersStore } from '@/stores/customers'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 
 const router = useRouter()
 const customersStore = useCustomersStore()
 const toast = useToast()
 const showConfirmDialog = ref(false)
+
+// Auto register/unregister layer di navigation stack
+useAutoNavigationStack(showConfirmDialog, 'add-customer-confirm-dialog')
 const isSubmitting = ref(false)
 const kecamatanError = ref(false)
 

@@ -250,6 +250,7 @@ import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DateField from '@/components/common/DateField.vue'
 import { useFinanceStore } from '@/stores/finance'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 
 const store = useFinanceStore()
 
@@ -271,6 +272,9 @@ const bankNet = computed(() => bankIn.value - bankOut.value)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const showFilterModal = ref(false)
+
+// Auto register/unregister modal di navigation stack
+useAutoNavigationStack(showFilterModal, 'cash-flow-filter-modal')
 
 const cashFlow = ref<any>({ cashIn: 0, cashOut: 0, netCash: 0, lines: [] })
 

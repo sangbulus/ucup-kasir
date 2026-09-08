@@ -212,7 +212,9 @@ export const sqliteReturnsService = {
       // Queue jurnal reversal retur
       if (autoJournalId) {
         const journal = await sqliteFinanceService.getJournal(autoJournalId)
-        await addToSyncQueue('INSERT', 'journal_entries', autoJournalId, journal || { id: autoJournalId })
+        if (journal) {
+          await addToSyncQueue('INSERT', 'journal_entries', autoJournalId, journal)
+        }
       }
       return returnId
     })

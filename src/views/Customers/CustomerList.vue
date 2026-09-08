@@ -508,6 +508,7 @@ import ImportCsvModal from '@/components/common/ImportCsvModal.vue'
 import { useCustomersStore } from '@/stores/customers'
 import { useStoreSettingsStore } from '@/stores/storeSettings'
 import { useToast } from '@/composables/useToast'
+import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
 import {
   downloadCsv,
   parseCsv,
@@ -527,6 +528,9 @@ const showBulkDeleteDialog = ref(false)
 const showImportModal = ref(false)
 const customerToDelete = ref<any>(null)
 const searchQuery = ref('')
+
+// Auto register/unregister modals di navigation stack
+useAutoNavigationStack(showImportModal, 'customer-import-modal')
 const showMobileMenu = ref(false)
 const selectedMobileCustomer = ref<any>(null)
 
@@ -534,6 +538,9 @@ const selectedMobileCustomer = ref<any>(null)
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
 const showFilterModal = ref(false)
+
+// Auto register/unregister modals di navigation stack
+useAutoNavigationStack(showFilterModal, 'customer-list-filter-modal')
 const selectedKecamatan = ref<string | null>(null)
 
 // Available Kecamatans (unique list)
