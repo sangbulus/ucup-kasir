@@ -137,6 +137,63 @@ async function initSchema(): Promise<void> {
 async function migrateSchema(): Promise<void> {
   if (!db) throw new Error('SQLite belum diinisialisasi')
 
+  // Migrasi khusus: tabel journal_entries lama dibuat tanpa 'payroll' di CHECK
+  // reference_type. CREATE TABLE IF NOT EXISTS tidak mengubah tabel yang sudah
+  // ada, jadi rebuild tabel bila CHECK-nya belum mencakup 'payroll'
+  // (post_payroll_journal gagal insert tanpa ini).
+  try {
+    const res = await db.query(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='journal_entries'"
+    )
+    const tblSql = String(res.values?.[0]?.sql || '')
+    if (tblSql && !tblSql.includes("'payroll'")) {
+      await db.execute(
+        `CREATE TABLE journal_entries__new (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          journal_number TEXT NOT NULL,
+          entry_date TEXT NOT NULL,
+          description TEXT NOT NULL,
+          reference_type TEXT CHECK (reference_type IN ('manual', 'transaction', 'return', 'payment', 'void', 'purchase', 'purchase_payment', 'purchase_return', 'payroll')),
+          reference_id TEXT,
+          status TEXT NOT NULL DEFAULT 'posted' CHECK (status IN ('draft', 'posted', 'void')),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'synced',
+          updated_at_local TEXT
+        );
+        INSERT INTO journal_entries__new SELECT id, user_id, journal_number, entry_date, description, reference_type, reference_id, status, created_at, updated_at, sync_status, updated_at_local FROM journal_entries;
+        DROP TABLE journal_entries;
+        ALTER TABLE journal_entries__new RENAME TO journal_entries;
+        CREATE INDEX IF NOT EXISTS idx_journal_entries_user_date ON journal_entries (user_id, entry_date DESC);
+        CREATE INDEX IF NOT EXISTS idx_journal_entries_reference ON journal_entries (reference_type, reference_id);`,
+        true
+      )
+    }
+  } catch (e) {
+    console.warn('SQLite migrate: gagal rebuild journal_entries:', (e as Error).message)
+  }
+
+  // Migrasi: database lama dibuat sebelum kolom limit kredit ada.
+  // CREATE TABLE IF NOT EXISTS tidak menambah kolom ke tabel yang sudah ada,
+  // dan SQLite tidak mendukung ADD COLUMN IF NOT EXISTS — cek dulu via
+  // PRAGMA table_info. Tanpa ini SELECT/UPDATE store_settings & customers
+  // gagal dengan "no such column: default_credit_limit".
+  try {
+    const addColumnIfMissing = async (table: string, column: string, def: string) => {
+      const res = await db!.query(`PRAGMA table_info(${table})`)
+      const cols = (res.values || []).map((r: any) => String(r.name))
+      if (cols.length > 0 && !cols.includes(column)) {
+        await db!.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${def}`, false)
+      }
+    }
+    await addColumnIfMissing('store_settings', 'default_credit_limit', 'REAL NOT NULL DEFAULT 0')
+    await addColumnIfMissing('store_settings', 'loading_rate_per_sack', 'REAL NOT NULL DEFAULT 0')
+    await addColumnIfMissing('customers', 'credit_limit', 'REAL NOT NULL DEFAULT 0')
+  } catch (e) {
+    console.warn('SQLite migrate: gagal menambah kolom limit kredit:', (e as Error).message)
+  }
+
   try {
     const res = await db.query('SELECT value FROM sync_metadata WHERE key = ?', ['schema_version'])
     const currentVersion = res.values?.[0]?.value ? parseInt(String(res.values[0].value), 10) : 0

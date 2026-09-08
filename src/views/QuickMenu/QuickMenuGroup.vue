@@ -8,7 +8,7 @@
         <div class="flex items-center gap-3">
           <button
             type="button"
-            @click="router.back()"
+            @click="router.push('/')"
             class="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition active:scale-95 dark:bg-gray-800 dark:text-gray-300"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

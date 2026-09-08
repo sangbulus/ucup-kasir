@@ -31,6 +31,14 @@
               <label class="text-[11px] font-medium text-gray-500 dark:text-gray-400">Nama Toko</label>
               <p class="mt-0.5 text-sm text-gray-900 dark:text-white">{{ customer.store_name }}</p>
             </div>
+            <div>
+              <label class="text-[11px] font-medium text-gray-500 dark:text-gray-400">Limit Kredit</label>
+              <p v-if="effectiveCreditLimit > 0" class="mt-0.5 text-sm font-semibold text-gray-900 dark:text-white">
+                {{ formatCurrency(effectiveCreditLimit) }}
+                <span v-if="usesDefaultLimit" class="text-[10px] font-normal text-gray-400 dark:text-gray-500">(default)</span>
+              </p>
+              <p v-else class="mt-0.5 text-sm text-gray-400 dark:text-gray-600">Tanpa batas</p>
+            </div>
           </div>
         </div>
 
@@ -154,6 +162,15 @@
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-400">Catatan</label>
             <p v-if="customer.notes" class="mt-1 text-base text-gray-900 dark:text-white">{{ customer.notes }}</p>
             <p v-else class="mt-1 text-sm text-gray-400 dark:text-gray-600">-</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-400">Limit Kredit</label>
+            <p v-if="effectiveCreditLimit > 0" class="mt-1 text-base font-semibold text-gray-900 dark:text-white">
+              {{ formatCurrency(effectiveCreditLimit) }}
+              <span v-if="usesDefaultLimit" class="ml-1 text-xs font-normal text-gray-400 dark:text-gray-500">(default)</span>
+            </p>
+            <p v-else class="mt-1 text-sm text-gray-400 dark:text-gray-600">Tanpa batas</p>
           </div>
 
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -676,6 +693,7 @@ import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import ComponentCard from '@/components/common/ComponentCard.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { useCustomersStore } from '@/stores/customers'
+import { useStoreSettingsStore } from '@/stores/storeSettings'
 import { sqliteTransactionsService } from '@/services/sqlite/transactions'
 import { useToast } from '@/composables/useToast'
 import type { Transaction } from '@/types/database'
@@ -683,12 +701,22 @@ import type { Transaction } from '@/types/database'
 const router = useRouter()
 const route = useRoute()
 const customersStore = useCustomersStore()
+const settingsStore = useStoreSettingsStore()
 const toast = useToast()
 
 const customerId = route.params.id as string
 const customer = ref<any>(null)
 const loading = ref(true)
 const showDeleteDialog = ref(false)
+
+// Limit kredit efektif: pakai limit khusus customer, fallback ke default global
+const effectiveCreditLimit = computed(() => {
+  const own = customer.value?.credit_limit || 0
+  return own || settingsStore.settings.default_credit_limit || 0
+})
+const usesDefaultLimit = computed(
+  () => (customer.value?.credit_limit || 0) === 0 && effectiveCreditLimit.value > 0
+)
 
 // Transactions
 const transactions = ref<Transaction[]>([])

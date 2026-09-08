@@ -4,7 +4,7 @@
 
     <div class="space-y-6">
       <!-- Mobile Header -->
-      <MobilePageHeader title="Daftar Retur" :subtitle="returnsList.length + ' Retur'" back-to="/" />
+      <MobilePageHeader title="Daftar Retur" :subtitle="returnsList.length + ' Retur'" back-to="/quick-menu/penjualan" />
 
       <!-- Mobile View: Search & Cards -->
       <div class="space-y-4 md:hidden">

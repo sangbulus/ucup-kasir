@@ -20,8 +20,6 @@ import type {
   PayrollPeriodInsert,
   PayrollPeriodUpdate,
   Payroll,
-  PayrollInsert,
-  PayrollItem,
   PayrollSummary,
 } from '@/types/database'
 
@@ -305,7 +303,7 @@ export const hrService = {
   async fetchPayrollComponents(): Promise<PayrollComponent[]> {
     const { data, error } = await supabase
       .from('payroll_components')
-      .select('*')
+      .select('*, position:positions(name), employee:employees(name)')
       .order('type')
       .order('name')
     if (error) throw error
@@ -389,6 +387,14 @@ export const hrService = {
   async deletePayrollPeriod(id: string): Promise<void> {
     const { error } = await supabase
       .from('payroll_periods')
+      .delete()
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  async deletePayroll(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('payrolls')
       .delete()
       .eq('id', id)
     if (error) throw error

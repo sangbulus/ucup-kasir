@@ -11,6 +11,8 @@ const DEFAULT_SETTINGS: Omit<StoreSettings, 'id' | 'user_id' | 'created_at' | 'u
   tax_rate: 0,
   currency: 'IDR',
   receipt_footer: 'Terima kasih atas kunjungan Anda',
+  default_credit_limit: 0,
+  loading_rate_per_sack: 0,
 }
 
 export const storeSettingsService = {

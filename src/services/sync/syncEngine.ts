@@ -80,6 +80,9 @@ const DOWNLOAD_TABLES = [
   'delivery_orders',
   'delivery_items',
   'delivery_tracking',
+  'delivery_order_transactions',
+  'delivery_loaders',
+  'delivery_load_items',
 ] as const
 
 export interface SyncResult {
@@ -122,7 +125,8 @@ export async function downloadAllFromSupabase(): Promise<SyncResult> {
            purchaseInvoices, piItems, piPayments, purchaseReturns, purchaseReturnItems,
            departments, positions, employees, attendance,
            payrollComponents, payrollPeriods, payrolls, payrollItems,
-           vehicles, deliveryOrders, deliveryItems, deliveryTracking] = await Promise.all([
+           vehicles, deliveryOrders, deliveryItems, deliveryTracking,
+           doTransactions, deliveryLoaders, deliveryLoadItems] = await Promise.all([
       fetchAllFromTable('categories'),
       fetchAllFromTable('products'),
       fetchAllFromTable('customers'),
@@ -163,6 +167,9 @@ export async function downloadAllFromSupabase(): Promise<SyncResult> {
       fetchAllFromTable('delivery_orders'),
       fetchAllFromTable('delivery_items'),
       fetchAllFromTable('delivery_tracking'),
+      fetchAllFromTable('delivery_order_transactions'),
+      fetchAllFromTable('delivery_loaders'),
+      fetchAllFromTable('delivery_load_items'),
     ])
 
     // --- 3. Tulis ke SQLite (truncate + insert fresh, dalam urutan dependensi FK) ---
@@ -298,6 +305,11 @@ export async function downloadAllFromSupabase(): Promise<SyncResult> {
         if (d) d.tracking.push(tr)
       }
       await sqliteShippingService.replaceAllDeliveryOrders([...doMap.values()])
+
+      // anak DO: transaksi, tim muat, barang dimuat
+      await sqliteShippingService.replaceAllDeliveryOrderTransactions(doTransactions)
+      await sqliteShippingService.replaceAllDeliveryLoaders(deliveryLoaders)
+      await sqliteShippingService.replaceAllDeliveryLoadItems(deliveryLoadItems)
     } finally {
       await enableForeignKeys()
     }
@@ -532,6 +544,15 @@ async function processQueueItem(item: SyncQueueItem): Promise<void> {
     case 'delivery_tracking':
       await genericUpsert('delivery_tracking', operation, record_id, data)
       break
+    case 'delivery_order_transactions':
+      await genericUpsert('delivery_order_transactions', operation, record_id, data)
+      break
+    case 'delivery_loaders':
+      await genericUpsert('delivery_loaders', operation, record_id, data)
+      break
+    case 'delivery_load_items':
+      await genericUpsert('delivery_load_items', operation, record_id, data)
+      break
     default:
       throw new Error(`Tabel tidak dikenal: ${table_name}`)
   }
@@ -570,10 +591,22 @@ async function genericUpsert(
   if (error) throw error
 }
 
-/** Buang field internal SQLite (sync_status, updated_at_local) agar tidak bentrok. */
+/**
+ * Buang field internal SQLite (sync_status, updated_at_local) dan field
+ * hasil JOIN/komputasi yang bukan kolom Supabase (vehicle, driver, items,
+ * tracking, loaders, delivery_orders, total_sacks, dst.).
+ * Pengecualian: `data` pada notifications = kolom jsonb asli → dipertahankan.
+ */
+const COMPUTED_KEYS = new Set(['total_sacks'])
 function sanitizeForSupabase(data: Record<string, any>): Record<string, any> {
   const { sync_status, updated_at_local, ...rest } = data
-  return rest
+  const clean: Record<string, any> = {}
+  for (const [key, value] of Object.entries(rest)) {
+    if (COMPUTED_KEYS.has(key)) continue
+    if (value !== null && typeof value === 'object' && key !== 'data') continue
+    clean[key] = value
+  }
+  return clean
 }
 
 // ============================================================

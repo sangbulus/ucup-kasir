@@ -28,7 +28,7 @@
             <!-- Header -->
             <div class="flex items-center justify-between border-b border-gray-200 p-4 dark:border-white/[0.08]">
               <div>
-                <h3 class="text-sm font-bold text-gray-900 dark:text-white">Tanggal Transaksi</h3>
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ title }}</h3>
                 <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                   {{ selectedLabel }}
                 </p>
@@ -298,10 +298,13 @@ interface Props {
   modelValue: boolean
   /** Nilai awal dalam format datetime-local: YYYY-MM-DDTHH:mm */
   value?: string
+  /** Judul header modal (default: Tanggal Transaksi) */
+  title?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   value: '',
+  title: 'Tanggal Transaksi',
 })
 
 const emit = defineEmits<{

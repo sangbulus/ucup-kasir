@@ -18,7 +18,9 @@ export interface Product {
   stock: number
   minimum_stock?: number
   sku?: string
+  code?: string
   barcode?: string
+  unit?: string
   image_url?: string
   is_active: boolean
   created_at: string
@@ -42,6 +44,7 @@ export interface Customer {
   kecamatan?: string
   address?: string
   notes?: string
+  credit_limit: number
   created_at: string
   updated_at: string
 }
@@ -165,6 +168,8 @@ export interface StoreSettings {
   store_email?: string
   tax_enabled?: boolean
   tax_rate?: number
+  default_credit_limit?: number
+  loading_rate_per_sack?: number
   currency?: string
   receipt_footer?: string
   created_at: string
@@ -595,6 +600,9 @@ export interface PayrollComponent {
   is_active: boolean
   created_at: string
   updated_at: string
+  /** Join opsional untuk tampilan (kolom "Berlaku") */
+  position?: { name: string } | null
+  employee?: { name: string } | null
 }
 
 export type PayrollComponentInsert = Omit<PayrollComponent, 'id' | 'created_at' | 'updated_at'>
@@ -682,12 +690,59 @@ export interface Vehicle {
 export type VehicleInsert = Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>
 export type VehicleUpdate = Partial<VehicleInsert>
 
+// ------------------------------------------------------------
+// Anak Surat Jalan: referensi transaksi (1 DO → banyak transaksi),
+// tim muat, dan daftar barang dimuat (input manual).
+// Upah loader: CEIL( Σ(jumlah × harga) ÷ jumlah loader ) per DO selesai.
+// ------------------------------------------------------------
+
+export interface DeliveryOrderTransaction {
+  id: string
+  user_id?: string
+  delivery_order_id: string
+  transaction_id: string
+  created_at: string
+}
+
+export type DeliveryOrderTransactionInput = {
+  transaction_id: string
+}
+
+export interface DeliveryLoader {
+  id: string
+  user_id?: string
+  delivery_order_id: string
+  employee_id: string
+  employee_name?: string
+  created_at: string
+}
+
+export type DeliveryLoaderInput = {
+  employee_id: string
+  employee_name?: string
+}
+
+export interface DeliveryLoadItem {
+  id: string
+  user_id?: string
+  delivery_order_id: string
+  product_name: string
+  quantity: number
+  unit_price: number
+  created_at: string
+}
+
+export type DeliveryLoadItemInput = {
+  product_name: string
+  quantity: number
+  unit_price: number
+}
+
 export interface DeliveryOrder {
   id: string
   user_id?: string
   do_number: string
   do_date: string
-  transaction_id?: string
   customer_id?: string
   customer_name?: string
   customer_address?: string
@@ -702,6 +757,15 @@ export interface DeliveryOrder {
   driver?: Employee
   items?: DeliveryItem[]
   tracking?: DeliveryTracking[]
+  /** ID transaksi yang dirujuk surat jalan ini (banyak) */
+  transaction_ids?: string[]
+  transactions?: Transaction[]
+  /** Tim muat (karyawan) */
+  loaders?: DeliveryLoader[]
+  /** Daftar barang dimuat (input manual) */
+  load_items?: DeliveryLoadItem[]
+  /** Total karung (SUM quantity items) — dihitung dinamis */
+  qty_total?: number
 }
 
 export type DeliveryOrderInsert = Omit<DeliveryOrder, 'id' | 'created_at' | 'updated_at'>

@@ -194,6 +194,120 @@
         </div>
       </section>
 
+      <!-- Limit Kredit Customer -->
+      <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <button
+          @click="toggleSection('credit')"
+          class="flex w-full items-center justify-between p-4 text-left transition active:scale-[0.99]"
+        >
+          <div class="flex items-center gap-1.5">
+            <svg class="h-4 w-4 text-cyan-500 dark:text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+            <div>
+              <h2 class="font-outfit text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-200">
+                Limit Kredit Customer
+              </h2>
+              <p class="mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">Batas kredit default untuk customer</p>
+            </div>
+          </div>
+          <svg
+            :class="[
+              'h-5 w-5 text-gray-400 transition-transform duration-200',
+              expandedSections.credit ? 'rotate-180' : ''
+            ]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <div
+          v-show="expandedSections.credit"
+          class="space-y-3 border-t border-gray-200 p-4 text-xs dark:border-gray-800"
+        >
+          <div>
+            <label class="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">Limit Kredit Default (Rp)</label>
+            <div class="relative">
+              <CurrencyInput
+                v-model="formData.default_credit_limit"
+                class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 font-outfit font-bold text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
+                placeholder="0"
+              />
+              <span class="absolute right-3 top-1/2 -translate-y-1/2 transform text-xs font-bold text-gray-500 dark:text-gray-400">Rp</span>
+            </div>
+          </div>
+          <p class="text-[10px] text-gray-400 dark:text-gray-500">Limit kredit ini berlaku untuk semua customer. Customer bisa diatur limit khusus di halaman detail customer.</p>
+
+          <button
+            @click="saveCreditSection"
+            :disabled="savingCredit"
+            class="w-full rounded-xl bg-cyan-500 py-2.5 font-outfit text-xs font-bold text-white shadow-md transition active:scale-95 disabled:opacity-50"
+          >
+            {{ savingCredit ? 'Menyimpan...' : 'Simpan Limit Kredit' }}
+          </button>
+        </div>
+      </section>
+
+      <!-- Upah Bongkar Muat -->
+      <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <button
+          @click="toggleSection('upah')"
+          class="flex w-full items-center justify-between p-4 text-left transition active:scale-[0.99]"
+        >
+          <div class="flex items-center gap-1.5">
+            <svg class="h-4 w-4 text-emerald-500 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <div>
+              <h2 class="font-outfit text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-200">
+                Upah Bongkar Muat
+              </h2>
+              <p class="mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">Tarif global upah per karung</p>
+            </div>
+          </div>
+          <svg
+            :class="[
+              'h-5 w-5 text-gray-400 transition-transform duration-200',
+              expandedSections.upah ? 'rotate-180' : ''
+            ]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <div
+          v-show="expandedSections.upah"
+          class="space-y-3 border-t border-gray-200 p-4 text-xs dark:border-gray-800"
+        >
+          <div>
+            <label class="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">Upah per Karung (Rp)</label>
+            <div class="relative">
+              <CurrencyInput
+                v-model="formData.loading_rate_per_sack"
+                class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 font-outfit font-bold text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
+                placeholder="0"
+              />
+              <span class="absolute right-3 top-1/2 -translate-y-1/2 transform text-xs font-bold text-gray-500 dark:text-gray-400">Rp</span>
+            </div>
+          </div>
+          <p class="text-[10px] text-gray-400 dark:text-gray-500">Tarif ini otomatis terisi sebagai harga per unit pada item muatan di surat jalan, dan menjadi dasar perhitungan upah tim bongkar muat di payroll. Masih bisa diubah manual per item.</p>
+
+          <button
+            @click="saveUpahSection"
+            :disabled="savingUpah"
+            class="w-full rounded-xl bg-emerald-500 py-2.5 font-outfit text-xs font-bold text-white shadow-md transition active:scale-95 disabled:opacity-50"
+          >
+            {{ savingUpah ? 'Menyimpan...' : 'Simpan Upah per Karung' }}
+          </button>
+        </div>
+      </section>
+
       <!-- Tampilan Aplikasi -->
       <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
         <button
@@ -523,6 +637,80 @@
         </div>
       </section>
 
+      <!-- Sinkronisasi Database -->
+      <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <button
+          @click="toggleSection('sync')"
+          class="flex w-full items-center justify-between p-4 text-left transition active:scale-[0.99]"
+        >
+          <div class="flex items-center gap-1.5">
+            <svg class="h-4 w-4 text-indigo-500 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <div>
+              <h2 class="font-outfit text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-200">
+                Sinkronisasi Database
+              </h2>
+              <p class="mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">Upload dan download data dari server</p>
+            </div>
+          </div>
+          <svg
+            :class="[
+              'h-5 w-5 text-gray-400 transition-transform duration-200',
+              expandedSections.sync ? 'rotate-180' : ''
+            ]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <div
+          v-show="expandedSections.sync"
+          class="space-y-2.5 border-t border-gray-200 p-4 dark:border-gray-800"
+        >
+          <!-- Info Sync Terakhir -->
+          <div v-if="lastSyncInfo" class="rounded-lg bg-gray-50 p-2.5 text-[10px] dark:bg-gray-900/50">
+            <div class="flex items-center justify-between">
+              <span class="text-gray-500 dark:text-gray-400">Sync Terakhir:</span>
+              <span class="font-mono font-medium text-gray-700 dark:text-gray-300">
+                {{ lastSyncInfo.lastSyncAt ? formatSyncDate(lastSyncInfo.lastSyncAt) : 'Belum pernah' }}
+              </span>
+            </div>
+            <div class="mt-1 flex items-center justify-between">
+              <span class="text-gray-500 dark:text-gray-400">Download Terakhir:</span>
+              <span class="font-mono font-medium text-gray-700 dark:text-gray-300">
+                {{ lastSyncInfo.lastDownloadAt ? formatSyncDate(lastSyncInfo.lastDownloadAt) : 'Belum pernah' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Tombol Sinkronisasi -->
+          <button
+            @click="handleFullSync"
+            :disabled="syncing"
+            class="w-full rounded-xl bg-indigo-500 py-3 font-outfit text-xs font-bold text-white shadow-md transition active:scale-95 disabled:opacity-50"
+          >
+            <span v-if="syncing" class="flex items-center justify-center gap-2">
+              <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {{ syncProgress }}
+            </span>
+            <span v-else>Sinkronisasi Sekarang</span>
+          </button>
+
+          <div class="rounded-lg bg-gray-50 p-2.5 dark:bg-gray-900/50">
+            <p class="text-[10px] leading-relaxed text-gray-600 dark:text-gray-400">
+              <strong class="text-gray-900 dark:text-gray-200">Proses:</strong> Upload perubahan lokal ke server, lalu download data terbaru dari server.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <!-- Keluar -->
       <section class="rounded-2xl border border-red-200 bg-white shadow-sm dark:border-red-900/30 dark:bg-white/[0.03]">
         <button
@@ -691,6 +879,74 @@
         </div>
       </div>
 
+      <!-- Limit Kredit Customer -->
+      <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+        <div class="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Limit Kredit Customer</h3>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Batas kredit default untuk semua customer</p>
+        </div>
+        <div class="space-y-4 p-6">
+          <div>
+            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+              Limit Kredit Default (Rp)
+            </label>
+            <CurrencyInput
+              v-model="formData.default_credit_limit"
+              class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              placeholder="0"
+            />
+          </div>
+          <p class="text-xs text-gray-400 dark:text-gray-500">Limit kredit ini berlaku untuk semua customer. Customer bisa diatur limit khusus di halaman detail customer.</p>
+          <div class="flex justify-end pt-1">
+            <button
+              @click="saveCreditSection"
+              :disabled="savingCredit"
+              class="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-5 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+            >
+              <svg v-if="savingCredit" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {{ savingCredit ? 'Menyimpan...' : 'Simpan' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upah Bongkar Muat -->
+      <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+        <div class="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Upah Bongkar Muat</h3>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Tarif global upah per karung untuk tim bongkar muat</p>
+        </div>
+        <div class="space-y-4 p-6">
+          <div>
+            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+              Upah per Karung (Rp)
+            </label>
+            <CurrencyInput
+              v-model="formData.loading_rate_per_sack"
+              class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              placeholder="0"
+            />
+          </div>
+          <p class="text-xs text-gray-400 dark:text-gray-500">Tarif ini otomatis terisi sebagai harga per unit pada item muatan di surat jalan, dan menjadi dasar perhitungan upah tim bongkar muat di payroll. Masih bisa diubah manual per item.</p>
+          <div class="flex justify-end pt-1">
+            <button
+              @click="saveUpahSection"
+              :disabled="savingUpah"
+              class="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-5 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+            >
+              <svg v-if="savingUpah" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {{ savingUpah ? 'Menyimpan...' : 'Simpan' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Pengaturan Tampilan -->
       <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
         <div class="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
@@ -827,8 +1083,11 @@ import { useTheme } from '@/components/layout/ThemeProvider.vue'
 import { useNetwork } from '@/lib/network'
 import BackupStatus from '@/views/Sync/BackupStatus.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import CurrencyInput from '@/components/common/CurrencyInput.vue'
 import { LogoutIcon } from '@/icons'
 import { supabase } from '@/lib/supabase'
+import { downloadAllFromSupabase, uploadChangesToSupabase, getLastSyncInfo } from '@/services/sync/syncEngine'
+import { isNativeApp } from '@/lib/platform'
 
 const settingsStore = useStoreSettingsStore()
 const authStore = useAuthStore()
@@ -846,6 +1105,11 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const syncError = ref<string | null>(null)
 const lastSyncLabel = ref<string | null>(null)
 const showLogoutConfirm = ref(false)
+
+// State untuk sinkronisasi
+const syncing = ref(false)
+const syncProgress = ref('Memulai sinkronisasi...')
+const lastSyncInfo = ref<{ lastSyncAt: string | null; lastDownloadAt: string | null } | null>(null)
 
 // Backup & Sinkronisasi — status dari sync store
 const backupBusy = computed(() => syncStore.uploading || syncStore.syncing)
@@ -870,9 +1134,111 @@ async function handleUploadChanges() {
   }
 }
 
+/** Handle sinkronisasi penuh: upload perubahan lokal lalu download data terbaru */
+async function handleFullSync() {
+  if (!isNativeApp()) {
+    toast.error('Gagal!', 'Sinkronisasi hanya tersedia di aplikasi mobile')
+    return
+  }
+
+  if (!isOnline.value) {
+    toast.error('Gagal!', 'Tidak ada koneksi internet')
+    return
+  }
+
+  if (syncing.value) return
+
+  syncing.value = true
+  syncProgress.value = 'Memulai sinkronisasi...'
+
+  try {
+    // Step 1: Upload perubahan lokal ke server
+    syncProgress.value = 'Mengupload perubahan lokal...'
+    const uploadResult = await uploadChangesToSupabase()
+
+    if (!uploadResult.success && uploadResult.message) {
+      throw new Error(`Upload gagal: ${uploadResult.message}`)
+    }
+
+    const uploadedCount = uploadResult.uploaded || 0
+    console.log(`Upload: ${uploadedCount} item berhasil`)
+
+    // Step 2: Download data terbaru dari server
+    syncProgress.value = 'Mendownload data terbaru...'
+    const downloadResult = await downloadAllFromSupabase()
+
+    if (!downloadResult.success) {
+      throw new Error(`Download gagal: ${downloadResult.message}`)
+    }
+
+    const downloadedCount = downloadResult.downloaded || 0
+    console.log(`Download: ${downloadedCount} data berhasil`)
+
+    // Update info sync terakhir
+    await loadLastSyncInfo()
+
+    // Tampilkan notifikasi sukses
+    toast.success(
+      'Sinkronisasi Berhasil!',
+      `Upload: ${uploadedCount} perubahan, Download: ${downloadedCount} data`
+    )
+
+  } catch (e: any) {
+    console.error('Gagal sinkronisasi:', e)
+    toast.error('Gagal Sinkronisasi!', e.message || 'Terjadi kesalahan saat sinkronisasi')
+  } finally {
+    syncing.value = false
+    syncProgress.value = 'Memulai sinkronisasi...'
+  }
+}
+
+/** Load info sync terakhir */
+async function loadLastSyncInfo() {
+  try {
+    if (isNativeApp()) {
+      lastSyncInfo.value = await getLastSyncInfo()
+    }
+  } catch (e) {
+    console.error('Gagal load sync info:', e)
+  }
+}
+
+/** Format tanggal sync */
+function formatSyncDate(dateStr: string | null): string {
+  if (!dateStr) return 'Belum pernah'
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+
+  // Kurang dari 1 menit
+  if (diff < 60000) return 'Baru saja'
+
+  // Kurang dari 1 jam
+  if (diff < 3600000) {
+    const mins = Math.floor(diff / 60000)
+    return `${mins} menit lalu`
+  }
+
+  // Kurang dari 1 hari
+  if (diff < 86400000) {
+    const hours = Math.floor(diff / 3600000)
+    return `${hours} jam lalu`
+  }
+
+  // Format tanggal lengkap
+  return date.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 // Per-section saving state
 const savingStore = ref(false)
 const savingTax = ref(false)
+const savingCredit = ref(false)
+const savingUpah = ref(false)
 const savingProfile = ref(false)
 
 const saveStoreSection = async () => {
@@ -917,6 +1283,34 @@ const saveTaxSection = async () => {
   }
 }
 
+const saveCreditSection = async () => {
+  savingCredit.value = true
+  try {
+    await settingsStore.updateSettings({
+      default_credit_limit: formData.default_credit_limit || 0,
+    })
+    toast.success('Berhasil!', 'Limit kredit berhasil disimpan')
+  } catch (error: any) {
+    toast.error('Gagal!', error.message || 'Gagal menyimpan limit kredit')
+  } finally {
+    savingCredit.value = false
+  }
+}
+
+const saveUpahSection = async () => {
+  savingUpah.value = true
+  try {
+    await settingsStore.updateSettings({
+      loading_rate_per_sack: formData.loading_rate_per_sack || 0,
+    })
+    toast.success('Berhasil!', 'Tarif upah per karung disimpan')
+  } catch (error: any) {
+    toast.error('Gagal!', error.message || 'Gagal menyimpan tarif upah')
+  } finally {
+    savingUpah.value = false
+  }
+}
+
 const saveProfileSection = async () => {
   savingProfile.value = true
   try {
@@ -939,10 +1333,13 @@ const saveProfileSection = async () => {
 const expandedSections = reactive({
   store: false,
   tax: false,
+  credit: false,
+  upah: false,
   display: false,
   profile: false,
   security: false,
   backup: false,
+  sync: false,
 })
 
 const toggleSection = (section: keyof typeof expandedSections) => {
@@ -957,6 +1354,8 @@ const formData = reactive({
   store_email: '',
   tax_enabled: false,
   tax_rate: 0,
+  default_credit_limit: 0,
+  loading_rate_per_sack: 0,
   receipt_footer: '',
 })
 
@@ -1098,12 +1497,18 @@ onMounted(async () => {
   formData.store_email = s.store_email || ''
   formData.tax_enabled = s.tax_enabled || false
   formData.tax_rate = s.tax_rate || 0
+  formData.default_credit_limit = s.default_credit_limit || 0
+  formData.loading_rate_per_sack = s.loading_rate_per_sack || 0
   formData.receipt_footer = s.receipt_footer || ''
   loadProfile()
 
   // Muat info backup
   await syncStore.loadInfo()
   lastSyncLabel.value = syncStore.lastSyncAt || null
+
+  // Muat info sync terakhir untuk section sinkronisasi
+  await loadLastSyncInfo()
+
   // Hitung pending queue
   try {
     const { getSyncQueue } = await import('@/lib/sqlite')

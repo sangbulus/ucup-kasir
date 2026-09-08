@@ -11,7 +11,7 @@ export const sqliteCustomersService = {
   async getAll(): Promise<Customer[]> {
     const userId = getCurrentUserId()
     const rows = await query<any>(
-      `SELECT id, user_id, name, store_name, phone, kecamatan, address, notes, created_at, updated_at
+      `SELECT id, user_id, name, store_name, phone, kecamatan, address, notes, credit_limit, created_at, updated_at
        FROM customers
        WHERE user_id = ?
        ORDER BY name ASC`,
@@ -23,7 +23,7 @@ export const sqliteCustomersService = {
   async getById(id: string): Promise<Customer | null> {
     const userId = getCurrentUserId()
     const row = await queryOne<any>(
-      `SELECT id, user_id, name, store_name, phone, kecamatan, address, notes, created_at, updated_at
+      `SELECT id, user_id, name, store_name, phone, kecamatan, address, notes, credit_limit, created_at, updated_at
        FROM customers
        WHERE id = ? AND user_id = ?`,
       [id, userId]
@@ -38,8 +38,8 @@ export const sqliteCustomersService = {
 
     await transaction(async (tx) => {
       await tx.run(
-        `INSERT INTO customers (id, user_id, name, store_name, phone, kecamatan, address, notes, created_at, updated_at, sync_status, updated_at_local)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+        `INSERT INTO customers (id, user_id, name, store_name, phone, kecamatan, address, notes, credit_limit, created_at, updated_at, sync_status, updated_at_local)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
         [
           id,
           userId,
@@ -49,6 +49,7 @@ export const sqliteCustomersService = {
           customer.kecamatan ?? null,
           customer.address ?? null,
           customer.notes ?? null,
+          customer.credit_limit ?? 0,
           now,
           now,
           now,
@@ -65,6 +66,7 @@ export const sqliteCustomersService = {
       kecamatan: customer.kecamatan,
       address: customer.address,
       notes: customer.notes,
+      credit_limit: customer.credit_limit ?? 0,
       created_at: now,
       updated_at: now,
     }
@@ -83,8 +85,8 @@ export const sqliteCustomersService = {
       for (const c of customers) {
         const id = uuid()
         await tx.run(
-          `INSERT INTO customers (id, user_id, name, store_name, phone, kecamatan, address, notes, created_at, updated_at, sync_status, updated_at_local)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+          `INSERT INTO customers (id, user_id, name, store_name, phone, kecamatan, address, notes, credit_limit, created_at, updated_at, sync_status, updated_at_local)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
           [
             id,
             userId,
@@ -94,6 +96,7 @@ export const sqliteCustomersService = {
             c.kecamatan ?? null,
             c.address ?? null,
             c.notes ?? null,
+            c.credit_limit ?? 0,
             now,
             now,
             now,
@@ -108,6 +111,7 @@ export const sqliteCustomersService = {
           kecamatan: c.kecamatan,
           address: c.address,
           notes: c.notes,
+          credit_limit: c.credit_limit ?? 0,
           created_at: now,
           updated_at: now,
         })
@@ -136,7 +140,7 @@ export const sqliteCustomersService = {
     await transaction(async (tx) => {
       await tx.run(
         `UPDATE customers
-         SET name = ?, store_name = ?, phone = ?, kecamatan = ?, address = ?, notes = ?,
+         SET name = ?, store_name = ?, phone = ?, kecamatan = ?, address = ?, notes = ?, credit_limit = ?,
              updated_at = ?, sync_status = 'pending', updated_at_local = ?
          WHERE id = ? AND user_id = ?`,
         [
@@ -146,6 +150,7 @@ export const sqliteCustomersService = {
           updated.kecamatan ?? null,
           updated.address ?? null,
           updated.notes ?? null,
+          updated.credit_limit ?? 0,
           now,
           now,
           id,
@@ -169,13 +174,91 @@ export const sqliteCustomersService = {
   async search(queryStr: string): Promise<Customer[]> {
     const userId = getCurrentUserId()
     const rows = await query<any>(
-      `SELECT id, user_id, name, store_name, phone, kecamatan, address, notes, created_at, updated_at
+      `SELECT id, user_id, name, store_name, phone, kecamatan, address, notes, credit_limit, created_at, updated_at
        FROM customers
        WHERE user_id = ? AND (name LIKE ? OR phone LIKE ? OR kecamatan LIKE ?)
        ORDER BY name ASC`,
       [userId, `%${queryStr}%`, `%${queryStr}%`, `%${queryStr}%`]
     )
     return rows.map((r) => this.mapRow(r))
+  },
+
+  /**
+   * Menghitung total hutang customer (transaksi dengan remaining_amount > 0)
+   */
+  async getOutstandingBalance(customerId: string): Promise<number> {
+    const userId = getCurrentUserId()
+    const row = await queryOne<{ total: number | null }>(
+      `SELECT SUM(remaining_amount) as total
+       FROM transactions
+       WHERE customer_id = ? AND user_id = ? AND remaining_amount > 0 AND status != 'batal'`,
+      [customerId, userId]
+    )
+    return row?.total || 0
+  },
+
+  /**
+   * Validasi apakah customer masih bisa kredit (cek limit kredit)
+   * @returns { allowed: boolean, message?: string, currentDebt: number, limit: number }
+   */
+  async validateCreditLimit(customerId: string, additionalAmount: number): Promise<{
+    allowed: boolean
+    message?: string
+    currentDebt: number
+    limit: number
+  }> {
+    const userId = getCurrentUserId()
+
+    // Ambil data customer
+    const customer = await this.getById(customerId)
+    if (!customer) {
+      return {
+        allowed: false,
+        message: 'Customer tidak ditemukan',
+        currentDebt: 0,
+        limit: 0,
+      }
+    }
+
+    // Ambil limit kredit (gunakan default jika customer limit = 0)
+    let creditLimit = customer.credit_limit || 0
+
+    if (creditLimit === 0) {
+      // Gunakan limit default dari settings
+      const settingsRow = await queryOne<{ default_credit_limit: number | null }>(
+        `SELECT default_credit_limit FROM store_settings WHERE user_id = ? LIMIT 1`,
+        [userId]
+      )
+      creditLimit = settingsRow?.default_credit_limit || 0
+    }
+
+    // Jika limit = 0, artinya tidak ada batasan (unlimited)
+    if (creditLimit === 0) {
+      return {
+        allowed: true,
+        currentDebt: 0,
+        limit: 0,
+      }
+    }
+
+    // Hitung hutang saat ini
+    const currentDebt = await this.getOutstandingBalance(customerId)
+    const totalAfter = currentDebt + additionalAmount
+
+    if (totalAfter > creditLimit) {
+      return {
+        allowed: false,
+        message: `Limit kredit terlampaui. Limit: Rp ${creditLimit.toLocaleString('id-ID')}, Hutang saat ini: Rp ${currentDebt.toLocaleString('id-ID')}, Total setelah transaksi: Rp ${totalAfter.toLocaleString('id-ID')}`,
+        currentDebt,
+        limit: creditLimit,
+      }
+    }
+
+    return {
+      allowed: true,
+      currentDebt,
+      limit: creditLimit,
+    }
   },
 
   // ============================================================
@@ -188,8 +271,8 @@ export const sqliteCustomersService = {
       await tx.run('DELETE FROM customers WHERE user_id = ?', [userId])
       for (const r of records) {
         await tx.run(
-          `INSERT OR REPLACE INTO customers (id, user_id, name, store_name, phone, kecamatan, address, notes, created_at, updated_at, sync_status, updated_at_local)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
+          `INSERT OR REPLACE INTO customers (id, user_id, name, store_name, phone, kecamatan, address, notes, credit_limit, created_at, updated_at, sync_status, updated_at_local)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
           [
             r.id,
             r.user_id ?? userId,
@@ -199,6 +282,7 @@ export const sqliteCustomersService = {
             r.kecamatan ?? null,
             r.address ?? null,
             r.notes ?? null,
+            r.credit_limit ?? 0,
             r.created_at,
             r.updated_at,
             r.updated_at,
@@ -218,6 +302,7 @@ export const sqliteCustomersService = {
       kecamatan: r.kecamatan ?? undefined,
       address: r.address ?? undefined,
       notes: r.notes ?? undefined,
+      credit_limit: r.credit_limit ?? 0,
       created_at: r.created_at,
       updated_at: r.updated_at,
     }

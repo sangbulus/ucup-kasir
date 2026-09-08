@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Dashboard Pengiriman" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Pengiriman" subtitle="Dashboard &amp; rekap" @back="$router.back()" />
+    <MobilePageHeader title="Pengiriman" subtitle="Dashboard &amp; rekap" back-to="/quick-menu/pengiriman" />
 
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center py-20">

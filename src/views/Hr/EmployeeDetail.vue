@@ -42,7 +42,7 @@
             </div>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-0 md:grid-cols-4">
+        <div class="grid grid-cols-2 gap-0 md:grid-cols-3">
           <div class="border-b border-gray-200 p-4 md:border-r dark:border-gray-700">
             <p class="text-[10px] text-gray-500 dark:text-gray-400">Jabatan</p>
             <p class="mt-0.5 text-xs font-medium text-gray-900 dark:text-white">{{ data.position?.name || '-' }}</p>
@@ -51,13 +51,9 @@
             <p class="text-[10px] text-gray-500 dark:text-gray-400">Departemen</p>
             <p class="mt-0.5 text-xs font-medium text-gray-900 dark:text-white">{{ (data.position as any)?.department?.name || data.department?.name || '-' }}</p>
           </div>
-          <div class="border-b border-gray-200 p-4 md:border-r dark:border-gray-700">
+          <div class="border-b border-gray-200 p-4 dark:border-gray-700">
             <p class="text-[10px] text-gray-500 dark:text-gray-400">Tipe Gaji</p>
             <p class="mt-0.5 text-xs font-medium text-gray-900 dark:text-white">{{ data.salary_type || '-' }}</p>
-          </div>
-          <div class="border-b border-gray-200 p-4 dark:border-gray-700">
-            <p class="text-[10px] text-gray-500 dark:text-gray-400">Gaji Pokok</p>
-            <p class="mt-0.5 text-xs font-bold text-gray-900 dark:text-white">{{ formatCurrency(data.base_salary) }}</p>
           </div>
         </div>
       </div>
@@ -174,12 +170,12 @@
           <div
             v-for="p in employeePayrolls"
             :key="p.id"
-            @click="router.push(`/hr/payroll/${p.id}`)"
+            @click="router.push(`/hr/payroll/${p.period_id}`)"
             class="cursor-pointer rounded-xl border border-gray-200 bg-white p-3 hover:border-blue-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-500/50"
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-xs font-medium text-gray-900 dark:text-white">{{ (p as any).period_code || 'Periode' }}</p>
+                <p class="text-xs font-medium text-gray-900 dark:text-white">{{ periodCode(p.period_id) }}</p>
                 <p class="text-[10px] text-gray-500 dark:text-gray-400">Gross: {{ formatCurrency(p.total_gross) }}</p>
               </div>
               <div class="text-right">
@@ -194,8 +190,17 @@
       </div>
     </template>
 
-    <!-- Desktop Edit Button -->
-    <div v-if="data && !loading" class="mt-4 hidden md:flex justify-end">
+    <!-- Desktop Action Buttons -->
+    <div v-if="data && !loading" class="mt-4 hidden md:flex justify-end gap-2">
+      <button
+        @click="handleDelete"
+        class="flex items-center gap-2 rounded-xl border border-red-300 px-5 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10"
+      >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+        Hapus
+      </button>
       <button
         @click="$router.push(`/hr/employees/edit/${data.id}`)"
         class="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-blue-500"
@@ -216,7 +221,12 @@ import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import { useHrStore } from '@/stores/hr'
+import { useConfirm } from '@/composables/useConfirm'
+import { useToast } from '@/composables/useToast'
+import type { Payroll } from '@/types/database'
 
+const { confirm } = useConfirm()
+const toast = useToast()
 const route = useRoute()
 const router = useRouter()
 const store = useHrStore()
@@ -224,7 +234,19 @@ const store = useHrStore()
 const loading = ref(true)
 const data = computed(() => store.employees.find((e) => e.id === route.params.id) || null)
 const activeTab = ref('info')
-const attFilterMonth = ref(new Date().toISOString().slice(0, 7))
+const attFilterMonth = ref(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`)
+
+const handleDelete = async () => {
+  if (!data.value) return
+  if (!(await confirm(`Hapus karyawan "${data.value.name}"? Data absensi & payroll terkait akan ikut terhapus.`))) return
+  try {
+    await store.deleteEmployee(data.value.id)
+    toast.success('Terhapus!', 'Karyawan berhasil dihapus')
+    router.push('/hr/employees')
+  } catch (e: any) {
+    toast.error('Gagal!', e.message)
+  }
+}
 
 const tabs = [
   { key: 'info', label: 'Info' },
@@ -272,16 +294,34 @@ const filteredAttendance = computed(() => {
   }).sort((a, b) => b.attendance_date.localeCompare(a.attendance_date))
 })
 
+const payrollHistory = ref<Payroll[]>([])
+
+const periodCode = (periodId: string) =>
+  store.payrollPeriods.find((per) => per.id === periodId)?.period_code || 'Periode'
+
 const employeePayrolls = computed(() => {
-  return store.payrolls.filter((p) => p.employee_id === route.params.id).sort((a, b) => b.created_at.localeCompare(a.created_at))
+  return payrollHistory.value.filter((p) => p.employee_id === route.params.id).sort((a, b) => b.created_at.localeCompare(a.created_at))
 })
 
 onMounted(async () => {
-  await Promise.all([
-    store.fetchEmployees(),
-    store.fetchAttendance(),
-    store.fetchPayrollPeriods(),
-  ])
-  loading.value = false
+  try {
+    await Promise.all([
+      store.fetchEmployees(),
+      store.fetchAttendance(),
+      store.fetchPayrollPeriods(),
+    ])
+    // Riwayat payroll per karyawan: ambil slip dari tiap periode
+    // (store.payrolls hanya berisi slip periode terakhir yang dibuka)
+    const periods = store.payrollPeriods.slice(0, 12)
+    const chunks = await Promise.all(
+      periods.map((per) => store.fetchPayrolls(per.id).catch(() => [] as Payroll[]))
+    )
+    payrollHistory.value = chunks.flat().filter((p) => p.employee_id === route.params.id)
+  } catch (e: any) {
+    toast.error('Gagal memuat data!', e.message)
+  } finally {
+    // WAJIB di finally — kalau fetch gagal, spinner berhenti & tampil empty state
+    loading.value = false
+  }
 })
 </script>

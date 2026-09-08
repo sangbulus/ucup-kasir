@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Stok Gudang" class="hidden md:block" />
     <div class="space-y-6">
       <!-- ===== MOBILE: Header & Tombol Aksi ===== -->
-      <MobilePageHeader title="Stok Gudang" back-to="/">
+      <MobilePageHeader title="Stok Gudang" back-to="/quick-menu/gudang-stok">
         <template #actions>
           <button
             @click="openOpnameModal"

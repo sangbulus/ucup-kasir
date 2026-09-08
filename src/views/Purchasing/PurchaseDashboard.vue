@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Dashboard Pembelian" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Pembelian" subtitle="Modul Purchasing" @back="$router.back()" />
+    <MobilePageHeader title="Pembelian" subtitle="Modul Purchasing" back-to="/quick-menu/pembelian" />
 
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center py-20">

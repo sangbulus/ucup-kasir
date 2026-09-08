@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Jurnal Umum" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Jurnal Umum" subtitle="Pencatatan Transaksi Keuangan" @back="$router.back()">
+    <MobilePageHeader title="Jurnal Umum" subtitle="Pencatatan Transaksi Keuangan" back-to="/quick-menu/keuangan">
       <template #actions>
         <button
           @click="router.push('/finance/journal/new')"

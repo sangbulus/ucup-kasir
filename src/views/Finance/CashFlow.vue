@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Arus Kas" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Arus Kas" subtitle="Cash Flow" @back="$router.back()">
+    <MobilePageHeader title="Arus Kas" subtitle="Cash Flow" back-to="/quick-menu/keuangan">
       <template #actions>
         <button
           @click="showFilterModal = true"

@@ -10,12 +10,15 @@ import type {
   DeliveryOrderUpdate,
   DeliveryItemInsert,
   DeliveryTracking,
+  DeliveryLoaderInput,
+  DeliveryLoadItemInput,
 } from '@/types/database'
 
 // ============================================================
 // Store: Shipping / Pengiriman — Surat Jalan
 // - Master Kendaraan
 // - Surat Jalan (Delivery Order) + items + tracking
+// - Anak DO: transaksi, tim muat, barang dimuat (insentif bongkar muat)
 // ============================================================
 
 export const useShippingStore = defineStore('shipping', () => {
@@ -237,6 +240,60 @@ export const useShippingStore = defineStore('shipping', () => {
     }
   }
 
+  // ============================================================
+  // ANAK SURAT JALAN: transaksi, tim muat, barang dimuat
+  // ============================================================
+
+  async function saveDeliveryOrderTransactions(doId: string, transactionIds: string[]) {
+    loading.value = true
+    error.value = null
+    try {
+      await shippingServiceAdapter.saveDeliveryOrderTransactions(doId, transactionIds)
+      if (currentOrder.value?.id === doId) {
+        currentOrder.value = { ...currentOrder.value, transaction_ids: transactionIds }
+      }
+    } catch (e: any) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function saveDeliveryLoaders(doId: string, loaders: DeliveryLoaderInput[]) {
+    loading.value = true
+    error.value = null
+    try {
+      const saved = await shippingServiceAdapter.saveDeliveryLoaders(doId, loaders)
+      if (currentOrder.value?.id === doId) {
+        currentOrder.value = { ...currentOrder.value, loaders: saved }
+      }
+      return saved
+    } catch (e: any) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function saveDeliveryLoadItems(doId: string, items: DeliveryLoadItemInput[]) {
+    loading.value = true
+    error.value = null
+    try {
+      const saved = await shippingServiceAdapter.saveDeliveryLoadItems(doId, items)
+      if (currentOrder.value?.id === doId) {
+        currentOrder.value = { ...currentOrder.value, load_items: saved }
+      }
+      return saved
+    } catch (e: any) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     vehicles,
     deliveryOrders,
@@ -255,5 +312,8 @@ export const useShippingStore = defineStore('shipping', () => {
     deleteDeliveryOrder,
     saveDeliveryItems,
     fetchDeliveryTracking,
+    saveDeliveryOrderTransactions,
+    saveDeliveryLoaders,
+    saveDeliveryLoadItems,
   }
 })

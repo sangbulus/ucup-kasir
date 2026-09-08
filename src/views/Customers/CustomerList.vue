@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Daftar Customer" class="hidden md:block" />
     <div class="space-y-6">
       <!-- Mobile Header -->
-      <MobilePageHeader title="Daftar Customer" :subtitle="customersStore.customers.length + ' Customer'" back-to="/">
+      <MobilePageHeader title="Daftar Customer" :subtitle="customersStore.customers.length + ' Customer'" back-to="/quick-menu/penjualan">
         <template #actions>
           <button
             @click="addCustomer"
@@ -242,6 +242,14 @@
         <template #cell-kecamatan="{ value }">
           <span v-if="value" class="text-gray-800 dark:text-white/90">{{ value }}</span>
           <span v-else class="text-gray-400 dark:text-gray-600">-</span>
+        </template>
+
+        <template #cell-credit_limit="{ row }">
+          <span v-if="effectiveCreditLimit(row) > 0" class="text-gray-800 dark:text-white/90">
+            {{ formatRupiah(effectiveCreditLimit(row)) }}
+            <span v-if="!row.credit_limit" class="text-xs text-gray-400 dark:text-gray-600">(default)</span>
+          </span>
+          <span v-else class="text-gray-400 dark:text-gray-600">Tanpa batas</span>
         </template>
 
         <template #cell-address="{ value }">
@@ -640,8 +648,21 @@ const columns = [
   { key: 'store_name', label: 'NAMA TOKO', sortable: true, width: 'w-2/12' },
   { key: 'phone', label: 'TELEPON', sortable: true, width: 'w-2/12' },
   { key: 'kecamatan', label: 'KECAMATAN', sortable: true, width: 'w-2/12' },
+  { key: 'credit_limit', label: 'LIMIT KREDIT', sortable: true, width: 'w-2/12' },
   { key: 'address', label: 'ALAMAT', sortable: true, width: 'w-3/12' },
 ]
+
+// Limit kredit efektif: limit khusus customer, fallback ke default global
+const effectiveCreditLimit = (row: Customer) =>
+  row.credit_limit || settingsStore.settings.default_credit_limit || 0
+
+const formatRupiah = (amount: number) =>
+  new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount)
 
 onMounted(async () => {
   try {
@@ -851,6 +872,7 @@ const handleImportFile = async (file: File, updateExisting: boolean) => {
         kecamatan: kecamatanValue || undefined,
         address: (findValue(row, addressKey) ?? '').trim() || undefined,
         notes: (findValue(row, notesKey) ?? '').trim() || undefined,
+        credit_limit: 0,
       }
 
       // Deteksi duplikat: prioritas phone, lalu kombinasi name|store

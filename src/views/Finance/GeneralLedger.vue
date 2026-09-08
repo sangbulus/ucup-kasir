@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Buku Besar" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Buku Besar" subtitle="Riwayat Saldo Per Akun" @back="$router.back()">
+    <MobilePageHeader title="Buku Besar" subtitle="Riwayat Saldo Per Akun" back-to="/quick-menu/keuangan">
       <template #actions>
         <button
           @click="showAccountModal = true"

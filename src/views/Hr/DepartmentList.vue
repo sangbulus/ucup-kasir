@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Departemen" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Departemen" subtitle="Kelola departemen" back-to="/">
+    <MobilePageHeader title="Departemen" subtitle="Kelola departemen" back-to="/quick-menu/karyawan">
       <template #actions>
         <button
           @click="showForm = true; editTarget = null"
@@ -111,7 +111,7 @@
     </div>
 
     <!-- Mobile Cards -->
-    <div v-else class="grid grid-cols-1 gap-3 md:hidden">
+    <div v-if="store.departments.length > 0" class="grid grid-cols-1 gap-3 md:hidden">
       <div v-for="d in store.departments" :key="d.id" class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div class="flex items-center justify-between">
           <div>

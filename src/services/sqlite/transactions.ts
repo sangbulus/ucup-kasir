@@ -144,6 +144,45 @@ export const sqliteTransactionsService = {
       const paymentStatus = paid >= total ? 'lunas' : 'belum_lunas'
       const transactionNumber = generateTransactionNumber()
 
+      // 2b. Penegakan limit kredit (hard stop): blokir bila bagian kredit
+      // (sisa setelah bayar) membuat total hutang customer melewati limit.
+      // Limit = credit_limit customer; 0 → fallback default global; 0 lagi → unlimited.
+      if (input.customer_id && remaining > 0) {
+        const custRow = (
+          await tx.query<any>(
+            `SELECT credit_limit FROM customers WHERE id = ? AND user_id = ?`,
+            [input.customer_id, userId]
+          )
+        )[0]
+        let creditLimit = custRow?.credit_limit || 0
+        if (creditLimit === 0) {
+          const sRow = (
+            await tx.query<any>(
+              `SELECT default_credit_limit FROM store_settings WHERE user_id = ? LIMIT 1`,
+              [userId]
+            )
+          )[0]
+          creditLimit = sRow?.default_credit_limit || 0
+        }
+        if (creditLimit > 0) {
+          const debtRow = (
+            await tx.query<any>(
+              `SELECT COALESCE(SUM(remaining_amount), 0) as total FROM transactions
+               WHERE customer_id = ? AND user_id = ? AND remaining_amount > 0 AND status != 'batal'`,
+              [input.customer_id, userId]
+            )
+          )[0]
+          const currentDebt = debtRow?.total || 0
+          if (currentDebt + remaining > creditLimit) {
+            throw new Error(
+              `Limit kredit terlampaui. Limit: Rp ${creditLimit.toLocaleString('id-ID')}, ` +
+                `Hutang saat ini: Rp ${currentDebt.toLocaleString('id-ID')}, ` +
+                `Sisa transaksi ini: Rp ${remaining.toLocaleString('id-ID')}`
+            )
+          }
+        }
+      }
+
       // Hitung total HPP (cost of goods sold) untuk auto-jurnal
       const totalCogs = itemDetails.reduce((sum, d) => sum + d.priceBuy * d.quantity, 0)
 

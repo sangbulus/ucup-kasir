@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Absensi" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Absensi" subtitle="Data kehadiran karyawan" back-to="/" />
+    <MobilePageHeader title="Absensi" subtitle="Data kehadiran karyawan" back-to="/quick-menu/karyawan" />
 
     <!-- Filter -->
     <div class="mb-4 flex flex-wrap items-center gap-3">
@@ -84,7 +84,7 @@
     </div>
 
     <!-- Mobile Cards -->
-    <div v-else class="grid grid-cols-1 gap-3 md:hidden">
+    <div v-if="filteredAttendance.length > 0" class="grid grid-cols-1 gap-3 md:hidden">
       <div v-for="att in filteredAttendance" :key="att.id" class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div class="flex items-center justify-between">
           <div class="flex-1">
@@ -93,9 +93,13 @@
           </div>
           <span class="rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase" :class="getStatusBadge(att.status)">{{ att.status }}</span>
         </div>
-        <div class="mt-2 flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400">
+        <div class="mt-2 flex items-center justify-between gap-2 text-[10px] text-gray-500 dark:text-gray-400">
           <span>Masuk: {{ att.check_in || '-' }}</span>
           <span>Pulang: {{ att.check_out || '-' }}</span>
+        </div>
+        <div class="mt-2 flex gap-2">
+          <button @click="editAttendance(att)" class="rounded-lg border border-gray-300 px-2.5 py-1 text-[9px] font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800">Edit</button>
+          <button @click="handleDelete(att.id)" class="rounded-lg border border-red-300 px-2.5 py-1 text-[9px] font-medium text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10">Hapus</button>
         </div>
       </div>
     </div>
@@ -171,14 +175,20 @@ const store = useHrStore()
 const loading = computed(() => store.loading)
 
 const searchQuery = ref('')
-const filterDate = ref(new Date().toISOString().split('T')[0])
+// Tanggal lokal (bukan toISOString yang memakai UTC — sebelum jam 7 pagi
+// tanggal UTC masih hari sebelumnya untuk WIB)
+const localToday = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const filterDate = ref(localToday())
 const filterStatus = ref('')
 const showModal = ref(false)
 const editAttId = ref<string | null>(null)
 
 const defaultForm = () => ({
   employee_id: '',
-  attendance_date: new Date().toISOString().split('T')[0],
+  attendance_date: localToday(),
   check_in: '08:00',
   check_out: '17:00',
   status: 'hadir',
@@ -218,19 +228,24 @@ const closeModal = () => {
   Object.assign(attForm, defaultForm())
 }
 
+// Supabase mengembalikan kolom time sebagai "08:00:00" — input[type=time]
+// hanya menerima "HH:MM", jadi normalisasi saat load untuk edit.
+const normTime = (t?: string | null) => (t ? t.slice(0, 5) : '')
+
 const editAttendance = (att: any) => {
   editAttId.value = att.id
   attForm.employee_id = att.employee_id
   attForm.attendance_date = att.attendance_date
-  attForm.check_in = att.check_in || ''
-  attForm.check_out = att.check_out || ''
+  attForm.check_in = normTime(att.check_in)
+  attForm.check_out = normTime(att.check_out)
   attForm.status = att.status
   attForm.notes = att.notes || ''
   showModal.value = true
 }
 
 const handleAttSubmit = async () => {
-  if (!attForm.employee_id || !attForm.attendance_date) return
+  if (!attForm.employee_id) { toast.error('Validasi!', 'Pilih karyawan terlebih dahulu'); return }
+  if (!attForm.attendance_date) { toast.error('Validasi!', 'Tanggal absensi wajib diisi'); return }
   try {
     const payload: AttendanceInsert = {
       employee_id: attForm.employee_id,

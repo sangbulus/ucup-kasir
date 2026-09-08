@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Neraca Saldo" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Neraca Saldo" subtitle="Trial Balance" @back="$router.back()">
+    <MobilePageHeader title="Neraca Saldo" subtitle="Trial Balance" back-to="/quick-menu/keuangan">
       <template #actions>
         <button
           @click="showFilterModal = true"

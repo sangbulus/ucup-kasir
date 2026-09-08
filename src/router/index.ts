@@ -41,6 +41,14 @@ const router = createRouter({
       },
     },
     {
+      path: '/settings/sync-debugger',
+      name: 'Sync Debugger',
+      component: () => import('../views/Settings/SyncDebugger.vue'),
+      meta: {
+        title: 'Sync Debugger',
+      },
+    },
+    {
       path: '/notifications',
       name: 'Notifications',
       component: () => import('../views/Notifications.vue'),

@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Jabatan" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Jabatan" subtitle="Kelola jabatan &amp; gaji pokok" back-to="/">
+    <MobilePageHeader title="Jabatan" subtitle="Kelola jabatan karyawan" back-to="/quick-menu/karyawan">
       <template #actions>
         <button @click="openForm()" class="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm hover:bg-blue-500 active:scale-95">
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -35,10 +35,6 @@
             <option v-for="d in store.departments" :key="d.id" :value="d.id">{{ d.name }}</option>
           </select>
         </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Gaji Pokok (Rp) <span class="text-red-500">*</span></label>
-          <CurrencyInput v-model="formPos.base_salary" required class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" placeholder="0"/>
-        </div>
         <div class="flex items-center gap-2">
           <input v-model="formPos.is_active" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600" />
           <span class="text-xs text-gray-700 dark:text-gray-300">Aktif</span>
@@ -66,7 +62,6 @@
           <tr class="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
             <th class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Nama</th>
             <th class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Departemen</th>
-            <th class="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Gaji Pokok</th>
             <th class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Status</th>
             <th class="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Aksi</th>
           </tr>
@@ -75,7 +70,6 @@
           <tr v-for="p in store.positions" :key="p.id" class="border-b border-gray-100 transition hover:bg-blue-50/50 dark:border-gray-800 dark:hover:bg-blue-500/5">
             <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ p.name }}</td>
             <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ (p as any).department?.name || '-' }}</td>
-            <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">{{ formatCurrency(p.base_salary) }}</td>
             <td class="px-4 py-3">
               <span class="rounded-lg px-2 py-0.5 text-[9px] font-bold" :class="p.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'">{{ p.is_active ? 'Aktif' : 'Nonaktif' }}</span>
             </td>
@@ -89,7 +83,7 @@
     </div>
 
     <!-- Mobile Cards -->
-    <div v-else class="grid grid-cols-1 gap-3 md:hidden">
+    <div v-if="store.positions.length > 0" class="grid grid-cols-1 gap-3 md:hidden">
       <div v-for="p in store.positions" :key="p.id" class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div class="flex items-center justify-between">
           <div>
@@ -98,8 +92,7 @@
           </div>
           <span class="rounded-lg px-2 py-0.5 text-[9px] font-bold" :class="p.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'">{{ p.is_active ? 'Aktif' : 'Nonaktif' }}</span>
         </div>
-        <div class="mt-1 flex items-center justify-between">
-          <p class="text-xs font-bold text-gray-900 dark:text-white">{{ formatCurrency(p.base_salary) }}</p>
+        <div class="mt-1 flex items-center justify-end">
           <div class="flex gap-2">
             <button @click="editPos(p)" class="rounded-lg border border-gray-300 px-2.5 py-1 text-[9px] font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800">Edit</button>
             <button @click="handleDelete(p.id)" class="rounded-lg border border-red-300 px-2.5 py-1 text-[9px] font-medium text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10">Hapus</button>
@@ -115,7 +108,6 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
 import { ref, reactive, onMounted } from 'vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
-import CurrencyInput from '@/components/common/CurrencyInput.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import { useHrStore } from '@/stores/hr'
@@ -149,7 +141,7 @@ const editPos = (p: any) => {
 const handleSubmit = async () => {
   if (!formPos.name.trim()) return
   try {
-    const payload = { name: formPos.name.trim(), department_id: formPos.department_id || undefined, base_salary: Number(formPos.base_salary) || 0, is_active: formPos.is_active }
+    const payload = { name: formPos.name.trim(), department_id: formPos.department_id || undefined, base_salary: 0, is_active: formPos.is_active }
     if (editTarget.value) {
       await store.updatePosition(editTarget.value, payload)
     } else {
@@ -164,8 +156,6 @@ const handleDelete = async (id: string) => {
   if (!(await confirm('Hapus jabatan ini?'))) return
   try { await store.deletePosition(id) } catch (e: any) { toast.error('Gagal!', e.message) }
 }
-
-const formatCurrency = (v: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v || 0)
 
 onMounted(() => Promise.all([store.fetchPositions(), store.fetchDepartments()]))
 </script>

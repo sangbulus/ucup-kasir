@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Dashboard HR" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Dashboard HR" subtitle="Manajemen Karyawan &amp; Payroll" @back="$router.back()" />
+    <MobilePageHeader title="Dashboard HR" subtitle="Manajemen Karyawan &amp; Payroll" back-to="/quick-menu/karyawan" />
 
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center py-20">
@@ -170,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'

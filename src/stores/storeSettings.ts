@@ -34,6 +34,9 @@ export const useStoreSettingsStore = defineStore('storeSettings', () => {
   const taxEnabled = computed(() => settings.value.tax_enabled || false)
   const taxRate = computed(() => settings.value.tax_rate || 0)
   const receiptFooter = computed(() => settings.value.receipt_footer || 'Terima kasih atas kunjungan Anda')
+  const defaultCreditLimit = computed(() => settings.value.default_credit_limit || 0)
+  // Tarif global upah bongkar muat per karung (dipakai di surat jalan & payroll)
+  const loadingRatePerSack = computed(() => settings.value.loading_rate_per_sack || 0)
 
   async function fetchSettings() {
     loading.value = true
@@ -77,6 +80,8 @@ export const useStoreSettingsStore = defineStore('storeSettings', () => {
     taxEnabled,
     taxRate,
     receiptFooter,
+    defaultCreditLimit,
+    loadingRatePerSack,
     fetchSettings,
     updateSettings,
   }

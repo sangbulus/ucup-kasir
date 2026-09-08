@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Komponen Gaji" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Komponen Gaji" subtitle="Tunjangan &amp; potongan" back-to="/">
+    <MobilePageHeader title="Komponen Gaji" subtitle="Tunjangan &amp; potongan" back-to="/quick-menu/karyawan">
       <template #actions>
         <button @click="openForm()" class="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm hover:bg-blue-500 active:scale-95">
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -124,7 +124,7 @@
     </div>
 
     <!-- Mobile Cards -->
-    <div v-else class="grid grid-cols-1 gap-3 md:hidden">
+    <div v-if="store.payrollComponents.length > 0" class="grid grid-cols-1 gap-3 md:hidden">
       <div v-for="c in store.payrollComponents" :key="c.id" class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div class="flex items-center justify-between">
           <div>
@@ -210,7 +210,9 @@ const applyToLabel = (c: any) => {
 }
 
 const handleSubmit = async () => {
-  if (!formComp.name.trim()) return
+  if (!formComp.name.trim()) { toast.error('Validasi!', 'Nama komponen wajib diisi'); return }
+  if (formComp.apply_to === 'per_jabatan' && !formComp.position_id) { toast.error('Validasi!', 'Pilih jabatan untuk komponen ini'); return }
+  if (formComp.apply_to === 'per_karyawan' && !formComp.employee_id) { toast.error('Validasi!', 'Pilih karyawan untuk komponen ini'); return }
   try {
     const payload: PayrollComponentInsert = {
       name: formComp.name.trim(),

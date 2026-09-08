@@ -26,7 +26,17 @@
         <div class="flex items-center justify-between">
           <div>
             <p class="text-lg font-black text-gray-900 dark:text-white">{{ order.do_number }}</p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">{{ formatDate(order.do_date) }}</p>
+            <!-- Tanggal pengiriman: klik untuk ubah -->
+            <div class="flex items-center gap-1.5">
+              <p class="text-xs text-gray-500 dark:text-gray-400">{{ formatDate(order.do_date) }}</p>
+              <button
+                @click="startEditDate"
+                class="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-blue-400"
+                title="Ubah tanggal pengiriman"
+              >
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              </button>
+            </div>
           </div>
           <span class="rounded-xl px-3 py-1 text-[11px] font-bold uppercase" :class="getStatusBadge(order.status)">{{ statusLabel(order.status) }}</span>
         </div>
@@ -98,19 +108,64 @@
         </div>
       </div>
 
-      <!-- Items -->
+      <!-- Transaksi dirujuk -->
       <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <h3 class="mb-3 text-sm font-bold text-gray-900 dark:text-white">Item Pengiriman</h3>
-        <div v-if="!order.items || order.items.length === 0" class="rounded-xl border border-dashed border-gray-300 py-6 text-center dark:border-gray-700">
-          <p class="text-xs text-gray-500 dark:text-gray-400">Tidak ada item.</p>
+        <h3 class="mb-3 text-sm font-bold text-gray-900 dark:text-white">Transaksi Dirujuk <span class="ml-1 text-[10px] font-medium text-gray-400">({{ order.transactions?.length || 0 }})</span></h3>
+        <div v-if="!order.transactions || order.transactions.length === 0" class="rounded-xl border border-dashed border-gray-300 py-6 text-center dark:border-gray-700">
+          <p class="text-xs text-gray-500 dark:text-gray-400">Tidak ada transaksi dirujuk.</p>
         </div>
         <div v-else class="space-y-2">
-          <div v-for="(it, i) in order.items" :key="i" class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-800">
-            <div class="flex-1 min-w-0">
-              <p class="truncate text-xs font-medium text-gray-900 dark:text-white">{{ it.product_name }}</p>
+          <router-link v-for="(t, i) in order.transactions" :key="i" :to="`/transactions/${t.id}`" class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
+            <div class="min-w-0">
+              <p class="truncate text-xs font-medium text-gray-900 dark:text-white">{{ t.transaction_number }}</p>
+              <p class="truncate text-[10px] text-gray-500 dark:text-gray-400">{{ t.customer_name || '-' }}</p>
             </div>
-            <p class="text-xs font-semibold text-gray-900 dark:text-white">{{ it.quantity }} <span class="text-[9px] font-normal text-gray-400">item</span></p>
-          </div>
+            <p class="text-xs font-semibold text-gray-900 dark:text-white">{{ formatMoney(t.total || 0) }}</p>
+          </router-link>
+        </div>
+      </div>
+
+      <!-- Barang dimuat + tim muat + upah -->
+      <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <h3 class="mb-3 text-sm font-bold text-gray-900 dark:text-white">Muatan &amp; Tim Muat</h3>
+
+        <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Item Pengiriman</p>
+        <div v-if="loadRows.length === 0" class="mb-4 rounded-xl border border-dashed border-gray-300 py-5 text-center dark:border-gray-700">
+          <p class="text-xs text-gray-500 dark:text-gray-400">Belum ada item.</p>
+        </div>
+        <div v-else class="mb-4 overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-400 dark:border-gray-700">
+                <th class="py-2 pr-2 font-medium">Produk</th>
+                <th class="py-2 px-2 text-right font-medium">Jumlah</th>
+                <th class="py-2 px-2 text-right font-medium">Harga/Unit</th>
+                <th class="py-2 pl-2 text-right font-medium">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(li, i) in loadRows" :key="i" class="border-b border-gray-100 last:border-0 dark:border-gray-800">
+                <td class="py-2 pr-2 font-medium text-gray-900 dark:text-white">{{ li.product_name }}</td>
+                <td class="py-2 px-2 text-right text-gray-700 dark:text-gray-300">{{ li.quantity }}</td>
+                <td class="py-2 px-2 text-right text-gray-700 dark:text-gray-300">{{ formatMoney(li.unit_price) }}</td>
+                <td class="py-2 pl-2 text-right font-semibold text-gray-900 dark:text-white">{{ formatMoney(li.quantity * li.unit_price) }}</td>
+              </tr>
+              <tr>
+                <td colspan="3" class="pt-2.5 pr-2 text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400">Total nilai muatan</td>
+                <td class="pt-2.5 pl-2 text-right text-xs font-black text-gray-900 dark:text-white">{{ formatMoney(totalLoadValue) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Tim Muat <span class="normal-case">({{ order.loaders?.length || 0 }} orang)</span></p>
+        <div v-if="!order.loaders || order.loaders.length === 0" class="rounded-xl border border-dashed border-gray-300 py-5 text-center dark:border-gray-700">
+          <p class="text-xs text-gray-500 dark:text-gray-400">Belum ada tim muat.</p>
+        </div>
+        <div v-else class="flex flex-wrap gap-2">
+          <span v-for="(l, i) in order.loaders" :key="i" class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+            {{ l.employee_name || '-' }}
+          </span>
         </div>
       </div>
 
@@ -143,6 +198,13 @@
         </button>
       </div>
     </div>
+
+    <DatePickerModal
+      v-model="showDatePicker"
+      :value="order?.do_date"
+      title="Tanggal Pengiriman"
+      @update:value="saveDate"
+    />
   </AdminLayout>
 </template>
 
@@ -154,6 +216,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
+import DatePickerModal from '@/components/common/DatePickerModal.vue'
 import { useShippingStore } from '@/stores/shipping'
 
 const { confirm } = useConfirm()
@@ -164,6 +227,51 @@ const store = useShippingStore()
 
 const doId = route.params.id as string
 const order = computed(() => store.currentOrder)
+
+// ---- Ubah tanggal pengiriman langsung dari halaman detail (pakai DatePickerModal) ----
+const showDatePicker = ref(false)
+const savingDate = ref(false)
+
+const startEditDate = () => {
+  showDatePicker.value = true
+}
+
+const saveDate = async (value: string) => {
+  const newDate = value.slice(0, 10)
+  if (!newDate) return toast.warning('Perhatian', 'Tanggal belum diisi')
+  if (newDate === order.value?.do_date) return
+  // DO selesai ikut menentukan upah loader di payroll — konfirmasi bila periode sudah digenerate
+  if (order.value?.status === 'selesai') {
+    const ok = await confirm(
+      'Surat jalan ini sudah selesai dan bisa jadi sudah masuk payroll. ' +
+        'Ubah tanggalnya akan memindahkan perhitungan upah loader ke periode yang baru saat payroll digenerate ulang. Lanjutkan?'
+    )
+    if (!ok) return
+  }
+  savingDate.value = true
+  try {
+    await store.updateDeliveryOrder(doId, { do_date: newDate })
+    await store.getDeliveryOrder(doId)
+    toast.success('Tersimpan', 'Tanggal pengiriman diubah')
+  } catch (e: any) {
+    toast.error('Gagal!', e.message)
+  } finally {
+    savingDate.value = false
+  }
+}
+
+const formatMoney = (n: number) => 'Rp ' + new Intl.NumberFormat('id-ID').format(n || 0)
+
+// Satu daftar barang: utamakan load_items (punya harga); fallback items lama
+const loadRows = computed(() => {
+  const li = order.value?.load_items || []
+  if (li.length > 0) return li.map((r) => ({ product_name: r.product_name, quantity: r.quantity, unit_price: r.unit_price }))
+  return (order.value?.items || []).map((r) => ({ product_name: r.product_name, quantity: r.quantity, unit_price: 0 }))
+})
+
+const totalLoadValue = computed(() =>
+  loadRows.value.reduce((sum, li) => sum + (li.quantity || 0) * (li.unit_price || 0), 0)
+)
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -201,7 +309,7 @@ const formatDate = (d: string) => {
   if (!d) return '-'
   const date = new Date(d)
   if (isNaN(date.getTime())) return d
-  return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+  return date.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 const formatDateTime = (d: string) => {

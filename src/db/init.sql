@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS customers (
   kecamatan TEXT,
   address TEXT,
   notes TEXT,
+  credit_limit REAL NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   sync_status TEXT NOT NULL DEFAULT 'synced',
@@ -164,6 +165,8 @@ CREATE TABLE IF NOT EXISTS store_settings (
   store_email TEXT DEFAULT '',
   tax_enabled INTEGER NOT NULL DEFAULT 0,
   tax_rate REAL NOT NULL DEFAULT 0,
+  default_credit_limit REAL NOT NULL DEFAULT 0,
+  loading_rate_per_sack REAL NOT NULL DEFAULT 0,
   currency TEXT DEFAULT 'IDR',
   receipt_footer TEXT DEFAULT 'Terima kasih atas kunjungan Anda',
   created_at TEXT NOT NULL,
@@ -333,7 +336,7 @@ CREATE TABLE IF NOT EXISTS journal_entries (
   journal_number TEXT NOT NULL,
   entry_date TEXT NOT NULL,
   description TEXT NOT NULL,
-  reference_type TEXT CHECK (reference_type IN ('manual', 'transaction', 'return', 'payment', 'void', 'purchase', 'purchase_payment', 'purchase_return')),
+  reference_type TEXT CHECK (reference_type IN ('manual', 'transaction', 'return', 'payment', 'void', 'purchase', 'purchase_payment', 'purchase_return', 'payroll')),
   reference_id TEXT,
   status TEXT NOT NULL DEFAULT 'posted' CHECK (status IN ('draft', 'posted', 'void')),
   created_at TEXT NOT NULL,
@@ -794,7 +797,6 @@ CREATE TABLE IF NOT EXISTS delivery_orders (
   user_id TEXT NOT NULL,
   do_number TEXT NOT NULL,
   do_date TEXT NOT NULL,
-  transaction_id TEXT,
   customer_id TEXT,
   customer_name TEXT,
   customer_address TEXT,
@@ -807,16 +809,62 @@ CREATE TABLE IF NOT EXISTS delivery_orders (
   updated_at TEXT NOT NULL,
   sync_status TEXT NOT NULL DEFAULT 'synced',
   updated_at_local TEXT,
-  FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
   FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
   FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE SET NULL,
   FOREIGN KEY (driver_id) REFERENCES employees(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_delivery_orders_user_date ON delivery_orders (user_id, do_date DESC);
-CREATE INDEX IF NOT EXISTS idx_delivery_orders_transaction ON delivery_orders (transaction_id);
 CREATE INDEX IF NOT EXISTS idx_delivery_orders_status ON delivery_orders (status);
 
--- 40) Item Surat Jalan
+-- 40) Referensi transaksi per Surat Jalan (1 DO → banyak transaksi)
+CREATE TABLE IF NOT EXISTS delivery_order_transactions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  delivery_order_id TEXT NOT NULL,
+  transaction_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'synced',
+  updated_at_local TEXT,
+  FOREIGN KEY (delivery_order_id) REFERENCES delivery_orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
+  UNIQUE (delivery_order_id, transaction_id)
+);
+CREATE INDEX IF NOT EXISTS idx_do_transactions_do ON delivery_order_transactions (delivery_order_id);
+CREATE INDEX IF NOT EXISTS idx_do_transactions_tx ON delivery_order_transactions (transaction_id);
+
+-- 41) Tim muat per Surat Jalan (karyawan yang ikut memuat)
+CREATE TABLE IF NOT EXISTS delivery_loaders (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  delivery_order_id TEXT NOT NULL,
+  employee_id TEXT NOT NULL,
+  employee_name TEXT,
+  created_at TEXT NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'synced',
+  updated_at_local TEXT,
+  FOREIGN KEY (delivery_order_id) REFERENCES delivery_orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+  UNIQUE (delivery_order_id, employee_id)
+);
+CREATE INDEX IF NOT EXISTS idx_delivery_loaders_do ON delivery_loaders (delivery_order_id);
+CREATE INDEX IF NOT EXISTS idx_delivery_loaders_employee ON delivery_loaders (employee_id);
+
+-- 42) Barang dimuat per Surat Jalan (input manual: nama + jumlah + harga upah/satuan)
+CREATE TABLE IF NOT EXISTS delivery_load_items (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  delivery_order_id TEXT NOT NULL,
+  product_name TEXT NOT NULL,
+  quantity REAL NOT NULL DEFAULT 0,
+  unit_price REAL NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'synced',
+  updated_at_local TEXT,
+  FOREIGN KEY (delivery_order_id) REFERENCES delivery_orders(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_delivery_load_items_do ON delivery_load_items (delivery_order_id);
+
+-- 43) Item Surat Jalan
 CREATE TABLE IF NOT EXISTS delivery_items (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
@@ -845,3 +893,21 @@ CREATE TABLE IF NOT EXISTS delivery_tracking (
   FOREIGN KEY (delivery_order_id) REFERENCES delivery_orders(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_delivery_tracking_do ON delivery_tracking (delivery_order_id, created_at DESC);
+
+-- ============================================================
+-- MIGRASI DB LAMA: pivot insentif dari Perjalanan → Surat Jalan
+-- (initSchema menjalankan statement satu per satu dengan try/catch;
+--  pada DB baru statement ini gagal "no such table/column" & diabaikan)
+-- ============================================================
+-- backfill referensi transaksi lama ke join table (sudah ada di Supabase → synced)
+INSERT OR IGNORE INTO delivery_order_transactions (id, user_id, delivery_order_id, transaction_id, created_at, sync_status)
+SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))),
+       user_id, id, transaction_id, created_at, 'synced'
+FROM delivery_orders WHERE transaction_id IS NOT NULL;
+
+-- Catatan: SQLite menolak DROP COLUMN pada kolom ber-FK, jadi kolom
+-- trip_id/transaction_id lama dibiarkan yatim (kode tidak membacanya lagi).
+DROP INDEX IF EXISTS idx_delivery_orders_trip;
+DROP INDEX IF EXISTS idx_delivery_orders_transaction;
+DROP TABLE IF EXISTS trip_loaders;
+DROP TABLE IF EXISTS trips;

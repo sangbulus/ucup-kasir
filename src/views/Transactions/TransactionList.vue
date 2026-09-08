@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Daftar Transaksi" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Daftar Transaksi" :subtitle="transactionsStore.transactions.length + ' Transaksi'" back-to="/">
+    <MobilePageHeader title="Daftar Transaksi" :subtitle="transactionsStore.transactions.length + ' Transaksi'" back-to="/quick-menu/penjualan">
       <template #actions>
         <button
           @click="addTransaction"

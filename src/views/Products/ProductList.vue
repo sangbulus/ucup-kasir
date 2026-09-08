@@ -4,7 +4,7 @@
     <div class="space-y-4">
 
       <!-- Mobile Header -->
-      <MobilePageHeader title="Produk" :subtitle="productsStore.products.length + ' produk terdaftar'" back-to="/">
+      <MobilePageHeader title="Produk" :subtitle="productsStore.products.length + ' produk terdaftar'" back-to="/quick-menu/gudang-stok">
         <template #actions>
           <button
             @click="addProduct"

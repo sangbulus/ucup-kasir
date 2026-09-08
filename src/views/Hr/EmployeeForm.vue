@@ -108,15 +108,6 @@
               <option value="mingguan">Mingguan</option>
             </select>
           </div>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Gaji Pokok (Rp) <span class="text-red-500">*</span></label>
-            <CurrencyInput
-              v-model="form.base_salary"
-              required
-              class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              placeholder="0"
-            />
-          </div>
           <div v-if="isEdit" class="sm:col-span-2">
             <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tanggal Keluar</label>
             <input v-model="form.resign_date" type="date" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
@@ -186,7 +177,6 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
-import CurrencyInput from '@/components/common/CurrencyInput.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import { useHrStore } from '@/stores/hr'

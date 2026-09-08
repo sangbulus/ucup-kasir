@@ -109,7 +109,7 @@ export const useHrStore = defineStore('hr', () => {
       await hrServiceAdapter.deleteDepartment(id)
       departments.value = departments.value.filter((d) => d.id !== id)
     } catch (e: any) {
-      if (old && index !== -1) departments.value.splice(index, 0, old)
+      if (old && index !== -1) departments.value[index] = old
       error.value = e.message
       throw e
     } finally {
@@ -177,7 +177,7 @@ export const useHrStore = defineStore('hr', () => {
       await hrServiceAdapter.deletePosition(id)
       positions.value = positions.value.filter((p) => p.id !== id)
     } catch (e: any) {
-      if (old && index !== -1) positions.value.splice(index, 0, old)
+      if (old && index !== -1) positions.value[index] = old
       error.value = e.message
       throw e
     } finally {
@@ -273,7 +273,7 @@ export const useHrStore = defineStore('hr', () => {
       employees.value = employees.value.filter((e) => e.id !== id)
       employeesWithStats.value = employeesWithStats.value.filter((e) => e.id !== id)
     } catch (e: any) {
-      if (old && index !== -1) employees.value.splice(index, 0, old)
+      if (old && index !== -1) employees.value[index] = old
       error.value = e.message
       throw e
     } finally {
@@ -383,7 +383,8 @@ export const useHrStore = defineStore('hr', () => {
     error.value = null
     try {
       const created = await hrServiceAdapter.createPayrollComponent(input)
-      payrollComponents.value.push(created)
+      // Ambil ulang agar field join (position/employee untuk kolom "Berlaku") terisi
+      await fetchPayrollComponents()
       return created
     } catch (e: any) {
       error.value = e.message
@@ -396,14 +397,12 @@ export const useHrStore = defineStore('hr', () => {
   async function updatePayrollComponent(id: string, updates: PayrollComponentUpdate) {
     loading.value = true
     error.value = null
-    const index = payrollComponents.value.findIndex((c) => c.id === id)
-    const old = index !== -1 ? { ...payrollComponents.value[index] } : null
     try {
       const updated = await hrServiceAdapter.updatePayrollComponent(id, updates)
-      if (index !== -1) payrollComponents.value[index] = updated
+      // Ambil ulang agar field join (position/employee untuk kolom "Berlaku") terisi
+      await fetchPayrollComponents()
       return updated
     } catch (e: any) {
-      if (old && index !== -1) payrollComponents.value[index] = old
       error.value = e.message
       throw e
     } finally {
@@ -534,11 +533,14 @@ export const useHrStore = defineStore('hr', () => {
     loading.value = true
     error.value = null
     try {
-      const generated = await hrServiceAdapter.generatePayroll(periodId)
-      payrolls.value = generated
+      await hrServiceAdapter.generatePayroll(periodId)
+      // RPC generate_payroll mengembalikan baris mentah tanpa join
+      // (tanpa nama karyawan & rincian item). Ambil ulang lewat
+      // fetchPayrolls agar slip langsung tampil lengkap.
+      payrolls.value = await hrServiceAdapter.fetchPayrolls(periodId)
       // Refresh summary periode
       await fetchPayrollPeriods()
-      return generated
+      return payrolls.value
     } catch (e: any) {
       error.value = e.message
       throw e
@@ -558,8 +560,25 @@ export const useHrStore = defineStore('hr', () => {
         payrollPeriods.value[index].status = 'paid'
         payrollPeriods.value[index].paid_at = new Date().toISOString()
       }
-      payrolls.value = payrolls.value.map((p) => ({ ...p, status: 'paid' as const }))
+      // Hanya slip milik periode ini yang berubah status — jangan sentuh slip periode lain
+      payrolls.value = payrolls.value.map((p) =>
+        p.period_id === periodId ? { ...p, status: 'paid' as const } : p
+      )
       return journalId
+    } catch (e: any) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function deletePayroll(id: string) {
+    loading.value = true
+    error.value = null
+    try {
+      await hrServiceAdapter.deletePayroll(id)
+      payrolls.value = payrolls.value.filter((p) => p.id !== id)
     } catch (e: any) {
       error.value = e.message
       throw e
@@ -624,6 +643,7 @@ export const useHrStore = defineStore('hr', () => {
     deletePayrollPeriod,
     fetchPayrolls,
     getPayroll,
+    deletePayroll,
     generatePayroll,
     postPayrollJournal,
     fetchPayrollSummary,

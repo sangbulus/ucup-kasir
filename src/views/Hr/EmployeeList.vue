@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Daftar Karyawan" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Karyawan" subtitle="Manajemen data karyawan" back-to="/">
+    <MobilePageHeader title="Karyawan" subtitle="Manajemen data karyawan" back-to="/quick-menu/karyawan">
       <template #actions>
         <button
           @click="$router.push('/hr/employees/add')"
@@ -180,7 +180,7 @@
     </div>
 
     <!-- Mobile Card Grid -->
-    <div v-else class="grid grid-cols-1 gap-3 md:hidden">
+    <div v-if="filteredEmployees.length > 0" class="grid grid-cols-1 gap-3 md:hidden">
       <div
         v-for="emp in filteredEmployees"
         :key="emp.id"

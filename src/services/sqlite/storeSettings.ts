@@ -17,6 +17,8 @@ const DEFAULT_SETTINGS: Omit<StoreSettings, 'id' | 'user_id' | 'created_at' | 'u
   tax_rate: 0,
   currency: 'IDR',
   receipt_footer: 'Terima kasih atas kunjungan Anda',
+  default_credit_limit: 0,
+  loading_rate_per_sack: 0,
 }
 
 export const sqliteStoreSettingsService = {
@@ -24,7 +26,7 @@ export const sqliteStoreSettingsService = {
     const userId = getCurrentUserId()
     const row = await queryOne<any>(
       `SELECT id, user_id, store_name, store_subtitle, store_address, store_phone,
-              store_email, tax_enabled, tax_rate, currency, receipt_footer, created_at, updated_at
+              store_email, tax_enabled, tax_rate, currency, receipt_footer, default_credit_limit, loading_rate_per_sack, created_at, updated_at
        FROM store_settings
        WHERE user_id = ?`,
       [userId]
@@ -41,8 +43,8 @@ export const sqliteStoreSettingsService = {
       await tx.run(
         `INSERT INTO store_settings (id, user_id, store_name, store_subtitle, store_address,
                                      store_phone, store_email, tax_enabled, tax_rate, currency,
-                                     receipt_footer, created_at, updated_at, sync_status, updated_at_local)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+                                     receipt_footer, default_credit_limit, loading_rate_per_sack, created_at, updated_at, sync_status, updated_at_local)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
         [
           id,
           userId,
@@ -55,6 +57,9 @@ export const sqliteStoreSettingsService = {
           DEFAULT_SETTINGS.tax_rate ?? 0,
           DEFAULT_SETTINGS.currency ?? 'IDR',
           DEFAULT_SETTINGS.receipt_footer ?? null,
+          DEFAULT_SETTINGS.default_credit_limit ?? 0,
+          DEFAULT_SETTINGS.loading_rate_per_sack ?? 0,
+          now,
           now,
           now,
           now,
@@ -83,7 +88,7 @@ export const sqliteStoreSettingsService = {
         `UPDATE store_settings
          SET store_name = ?, store_subtitle = ?, store_address = ?, store_phone = ?,
              store_email = ?, tax_enabled = ?, tax_rate = ?, currency = ?,
-             receipt_footer = ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
+             receipt_footer = ?, default_credit_limit = ?, loading_rate_per_sack = ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
          WHERE user_id = ?`,
         [
           updated.store_name,
@@ -95,6 +100,8 @@ export const sqliteStoreSettingsService = {
           updated.tax_rate ?? 0,
           updated.currency ?? 'IDR',
           updated.receipt_footer ?? null,
+          updated.default_credit_limit ?? 0,
+          updated.loading_rate_per_sack ?? 0,
           now,
           now,
           userId,
@@ -118,8 +125,8 @@ export const sqliteStoreSettingsService = {
         await tx.run(
           `INSERT OR REPLACE INTO store_settings (id, user_id, store_name, store_subtitle,
                    store_address, store_phone, store_email, tax_enabled, tax_rate, currency,
-                   receipt_footer, created_at, updated_at, sync_status, updated_at_local)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
+                   receipt_footer, default_credit_limit, loading_rate_per_sack, created_at, updated_at, sync_status, updated_at_local)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
           [
             r.id,
             r.user_id ?? userId,
@@ -132,6 +139,8 @@ export const sqliteStoreSettingsService = {
             r.tax_rate ?? 0,
             r.currency ?? 'IDR',
             r.receipt_footer ?? null,
+            r.default_credit_limit ?? 0,
+            r.loading_rate_per_sack ?? 0,
             r.created_at,
             r.updated_at,
             r.updated_at,
@@ -154,6 +163,8 @@ export const sqliteStoreSettingsService = {
       tax_rate: r.tax_rate,
       currency: r.currency,
       receipt_footer: r.receipt_footer,
+      default_credit_limit: r.default_credit_limit ?? 0,
+      loading_rate_per_sack: r.loading_rate_per_sack ?? 0,
       created_at: r.created_at,
       updated_at: r.updated_at,
     }

@@ -3,7 +3,7 @@
     <PageBreadcrumb pageTitle="Daftar Kategori" class="hidden md:block" />
 
     <!-- Mobile Header -->
-    <MobilePageHeader title="Daftar Kategori" :subtitle="categoriesStore.categories.length + ' Kategori'" back-to="/">
+    <MobilePageHeader title="Daftar Kategori" :subtitle="categoriesStore.categories.length + ' Kategori'" back-to="/quick-menu/gudang-stok">
       <template #actions>
         <button
           @click="addCategory"
