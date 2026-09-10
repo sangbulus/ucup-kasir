@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { transactionsServiceAdapter } from '@/services'
-import type { Transaction, TransactionInput } from '@/types/database'
+import type { Transaction, TransactionInput, TransactionStatus } from '@/types/database'
 
 export const useTransactionsStore = defineStore('transactions', () => {
   const transactions = ref<Transaction[]>([])
@@ -142,6 +142,25 @@ export const useTransactionsStore = defineStore('transactions', () => {
     }
   }
 
+  /** Ubah status transaksi (disiapkan/dikirim/selesai) & update local state. */
+  async function updateTransactionStatus(transactionId: string, transactionStatus: TransactionStatus) {
+    loading.value = true
+    error.value = null
+    try {
+      await transactionsServiceAdapter.updateStatus(transactionId, transactionStatus)
+      const index = transactions.value.findIndex((t) => t.id === transactionId)
+      if (index !== -1) {
+        const updated = await transactionsServiceAdapter.getById(transactionId)
+        if (updated) transactions.value[index] = updated
+      }
+    } catch (e: any) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     transactions,
     loading,
@@ -152,6 +171,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
     addPayment,
     deleteTransaction,
     voidTransaction,
+    updateTransactionStatus,
     searchTransactions,
     getTransactionsByCustomer,
   }

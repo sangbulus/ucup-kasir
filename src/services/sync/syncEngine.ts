@@ -26,6 +26,7 @@ import { sqliteFinanceService } from '@/services/sqlite/finance'
 import { sqlitePurchasingService } from '@/services/sqlite/purchasing'
 import { sqliteHrService } from '@/services/sqlite/hr'
 import { sqliteShippingService } from '@/services/sqlite/shipping'
+import { sqlitePriceMatrixService } from '@/services/sqlite/priceMatrix'
 import type { SyncQueueItem } from '@/lib/sqlite'
 
 // ============================================================
@@ -83,6 +84,10 @@ const DOWNLOAD_TABLES = [
   'delivery_order_transactions',
   'delivery_loaders',
   'delivery_load_items',
+  'price_tiers',
+  'customer_groups',
+  'customer_group_members',
+  'customer_price_matrix',
 ] as const
 
 export interface SyncResult {
@@ -127,7 +132,8 @@ export async function downloadAllFromSupabase(): Promise<SyncResult> {
            payrollComponents, payrollPeriods, payrolls, payrollItems,
            employeeLoans, employeeLoanPayments,
            vehicles, deliveryOrders, deliveryItems, deliveryTracking,
-           doTransactions, deliveryLoaders, deliveryLoadItems] = await Promise.all([
+           doTransactions, deliveryLoaders, deliveryLoadItems,
+           customerGroups, groupMembers, priceTiers, customerPrices] = await Promise.all([
       fetchAllFromTable('categories'),
       fetchAllFromTable('products'),
       fetchAllFromTable('customers'),
@@ -171,6 +177,10 @@ export async function downloadAllFromSupabase(): Promise<SyncResult> {
       fetchAllFromTable('delivery_order_transactions'),
       fetchAllFromTable('delivery_loaders'),
       fetchAllFromTable('delivery_load_items'),
+      fetchAllFromTable('customer_groups'),
+      fetchAllFromTable('customer_group_members'),
+      fetchAllFromTable('price_tiers'),
+      fetchAllFromTable('customer_price_matrix'),
     ])
 
     // --- 3. Tulis ke SQLite (truncate + insert fresh, dalam urutan dependensi FK) ---
@@ -317,6 +327,12 @@ export async function downloadAllFromSupabase(): Promise<SyncResult> {
       await sqliteShippingService.replaceAllDeliveryOrderTransactions(doTransactions)
       await sqliteShippingService.replaceAllDeliveryLoaders(deliveryLoaders)
       await sqliteShippingService.replaceAllDeliveryLoadItems(deliveryLoadItems)
+
+      // price matrix: grup → anggota → tier → harga khusus (FK children kemudian)
+      await sqlitePriceMatrixService.replaceAllGroups(customerGroups)
+      await sqlitePriceMatrixService.replaceAllGroupMembers(groupMembers)
+      await sqlitePriceMatrixService.replaceAllPriceTiers(priceTiers)
+      await sqlitePriceMatrixService.replaceAllCustomerPrices(customerPrices)
     } finally {
       await enableForeignKeys()
     }
@@ -560,6 +576,18 @@ async function processQueueItem(item: SyncQueueItem): Promise<void> {
     case 'delivery_load_items':
       await genericUpsert('delivery_load_items', operation, record_id, data)
       break
+    case 'customer_groups':
+      await genericUpsert('customer_groups', operation, record_id, data)
+      break
+    case 'customer_group_members':
+      await genericUpsert('customer_group_members', operation, record_id, data)
+      break
+    case 'price_tiers':
+      await genericUpsert('price_tiers', operation, record_id, data)
+      break
+    case 'customer_price_matrix':
+      await genericUpsert('customer_price_matrix', operation, record_id, data)
+      break
     default:
       throw new Error(`Tabel tidak dikenal: ${table_name}`)
   }
@@ -650,6 +678,7 @@ export async function uploadAllToSupabase(): Promise<SyncResult> {
     'payroll_components', 'payroll_periods', 'payrolls', 'payroll_items',
     'employee_loans', 'employee_loan_payments',
     'vehicles', 'delivery_orders', 'delivery_items', 'delivery_tracking',
+    'customer_groups', 'customer_group_members', 'price_tiers', 'customer_price_matrix',
   ]
 
   let uploaded = 0

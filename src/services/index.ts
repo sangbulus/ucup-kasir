@@ -27,6 +27,8 @@ import { hrService } from './hr'
 import { sqliteHrService } from './sqlite/hr'
 import { shippingService } from './shipping'
 import { sqliteShippingService } from './sqlite/shipping'
+import { priceMatrixService } from './priceMatrixService'
+import { sqlitePriceMatrixService } from './sqlite/priceMatrix'
 
 // ============================================================
 // Service factory — pilih implementasi berdasarkan platform.
@@ -53,4 +55,5 @@ export const financeServiceAdapter = isNativeApp() ? sqliteFinanceService : fina
 export const purchasingServiceAdapter = isNativeApp() ? sqlitePurchasingService : purchasingService
 export const hrServiceAdapter = isNativeApp() ? sqliteHrService : hrService
 export const shippingServiceAdapter = isNativeApp() ? sqliteShippingService : shippingService
+export const priceMatrixServiceAdapter = isNativeApp() ? sqlitePriceMatrixService : priceMatrixService
 export type { StockMovement, StockAdjustment, StockOpname, StockAlert }

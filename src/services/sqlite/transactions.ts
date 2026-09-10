@@ -1,7 +1,7 @@
 import { query, queryOne, run, addToSyncQueue, transaction } from './db'
 import { getCurrentUserId, uuid, nowIso, generateTransactionNumber } from './db'
 import { sqliteFinanceService } from './finance'
-import type { Transaction, TransactionInput, TransactionItem, TransactionPayment } from '@/types/database'
+import type { Transaction, TransactionInput, TransactionItem, TransactionPayment, TransactionStatus } from '@/types/database'
 
 // ============================================================
 // SQLite Service: Transactions
@@ -505,6 +505,21 @@ export const sqliteTransactionsService = {
     if (txn) await addToSyncQueue('UPDATE', 'transactions', id, txn)
   },
 
+  /** Ubah status transaksi (disiapkan/dikirim/selesai). */
+  async updateStatus(id: string, transactionStatus: TransactionStatus): Promise<void> {
+    const userId = getCurrentUserId()
+    const now = nowIso()
+
+    await run(
+      `UPDATE transactions SET transaction_status = ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
+       WHERE id = ? AND user_id = ?`,
+      [transactionStatus, now, now, id, userId]
+    )
+
+    const txn = await this.getById(id)
+    if (txn) await addToSyncQueue('UPDATE', 'transactions', id, txn)
+  },
+
 
   async search(queryStr: string): Promise<Transaction[]> {
     const userId = getCurrentUserId()
@@ -547,14 +562,14 @@ export const sqliteTransactionsService = {
         await tx.run(
           `INSERT OR REPLACE INTO transactions (id, user_id, transaction_number, customer_id, customer_name,
                    subtotal, discount, shipping_cost, return_amount, total, payment_method, paid_amount,
-                   change_amount, remaining_amount, payment_status, status, notes, created_at, updated_at,
+                   change_amount, remaining_amount, payment_status, status, transaction_status, notes, created_at, updated_at,
                    sync_status, updated_at_local)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
           [
             t.id, userId, t.transaction_number, t.customer_id ?? null, t.customer_name ?? null,
             t.subtotal, t.discount, t.shipping_cost ?? 0, t.return_amount ?? 0, t.total,
             t.payment_method, t.paid_amount, t.change_amount, t.remaining_amount,
-            t.payment_status, t.status, t.notes ?? null, t.created_at, t.updated_at, t.updated_at,
+            t.payment_status, t.status, (t as any).transaction_status ?? 'disiapkan', t.notes ?? null, t.created_at, t.updated_at, t.updated_at,
           ]
         )
 
@@ -625,6 +640,7 @@ export const sqliteTransactionsService = {
       remaining_amount: r.remaining_amount,
       payment_status: r.payment_status,
       status: r.status,
+      transaction_status: (r.transaction_status ?? 'disiapkan') as TransactionStatus,
       notes: r.notes ?? undefined,
       created_at: r.created_at,
       updated_at: r.updated_at,

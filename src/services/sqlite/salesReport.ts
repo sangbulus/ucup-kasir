@@ -518,6 +518,7 @@ export const sqliteSalesReportService = {
       remaining_amount: r.remaining_amount,
       payment_status: r.payment_status,
       status: r.status,
+      transaction_status: r.transaction_status ?? 'disiapkan',
       notes: r.notes ?? undefined,
       created_at: r.created_at,
       updated_at: r.updated_at,

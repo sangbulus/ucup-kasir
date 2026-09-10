@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   remaining_amount REAL NOT NULL DEFAULT 0,
   payment_status TEXT NOT NULL DEFAULT 'belum_lunas',
   status TEXT NOT NULL DEFAULT 'selesai',
+  transaction_status TEXT NOT NULL DEFAULT 'disiapkan',
   notes TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -897,6 +898,90 @@ CREATE TABLE IF NOT EXISTS delivery_tracking (
   FOREIGN KEY (delivery_order_id) REFERENCES delivery_orders(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_delivery_tracking_do ON delivery_tracking (delivery_order_id, created_at DESC);
+
+-- ============================================================
+-- MATRIKS HARGA (price matrix) — mirror Supabase
+-- Prioritas resolve harga: per-pelanggan → per-grup → tier → price_sell.
+-- ============================================================
+
+-- 44) Customer Groups (grup pelanggan untuk harga grup)
+CREATE TABLE IF NOT EXISTS customer_groups (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  notes TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'synced',
+  updated_at_local TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_customer_groups_user ON customer_groups (user_id);
+
+-- 45) Customer Group Members (anggota grup)
+CREATE TABLE IF NOT EXISTS customer_group_members (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  group_id TEXT NOT NULL,
+  customer_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'synced',
+  updated_at_local TEXT,
+  UNIQUE (group_id, customer_id),
+  FOREIGN KEY (group_id) REFERENCES customer_groups(id) ON DELETE CASCADE,
+  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_cgm_group ON customer_group_members (group_id);
+CREATE INDEX IF NOT EXISTS idx_cgm_customer ON customer_group_members (customer_id);
+
+-- 46) Price Tiers (harga bertingkat per rentang kuantitas)
+CREATE TABLE IF NOT EXISTS price_tiers (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  min_quantity INTEGER NOT NULL CHECK (min_quantity > 0),
+  max_quantity INTEGER,
+  tier_price REAL NOT NULL,
+  tier_name TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  start_date TEXT,
+  end_date TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'synced',
+  updated_at_local TEXT,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_price_tiers_user_product ON price_tiers (user_id, product_id, is_active);
+
+-- 47) Customer Price Matrix (harga khusus per pelanggan ATAU per grup)
+-- Tepat salah satu dari customer_id / group_id terisi.
+CREATE TABLE IF NOT EXISTS customer_price_matrix (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  customer_id TEXT,
+  group_id TEXT,
+  product_id TEXT NOT NULL,
+  custom_price REAL NOT NULL,
+  min_quantity INTEGER NOT NULL DEFAULT 1,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  start_date TEXT,
+  end_date TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'synced',
+  updated_at_local TEXT,
+  CHECK (
+    (customer_id IS NOT NULL AND group_id IS NULL)
+    OR (customer_id IS NULL AND group_id IS NOT NULL)
+  ),
+  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+  FOREIGN KEY (group_id) REFERENCES customer_groups(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_cpm_user_customer ON customer_price_matrix (user_id, customer_id, product_id);
+CREATE INDEX IF NOT EXISTS idx_cpm_group ON customer_price_matrix (group_id);
 
 -- ============================================================
 -- MIGRASI DB LAMA: pivot insentif dari Perjalanan → Surat Jalan

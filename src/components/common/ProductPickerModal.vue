@@ -113,6 +113,7 @@
                     type="checkbox"
                     :checked="isSelected(product.id)"
                     :disabled="product.stock <= 0"
+                    @click.stop
                     @change="toggleSelect(product.id)"
                     class="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-brand-500 focus:ring-brand-500 disabled:cursor-not-allowed"
                   />

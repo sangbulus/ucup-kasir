@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { Transaction, TransactionInput } from '@/types/database'
+import type { Transaction, TransactionInput, TransactionStatus } from '@/types/database'
 
 export const transactionsService = {
   async getAll(): Promise<Transaction[]> {
@@ -76,6 +76,16 @@ export const transactionsService = {
     const { error } = await supabase
       .from('transactions')
       .update({ status: 'void' })
+      .eq('id', id)
+
+    if (error) throw error
+  },
+
+  /** Ubah status transaksi (disiapkan/dikirim/selesai). */
+  async updateStatus(id: string, transactionStatus: TransactionStatus): Promise<void> {
+    const { error } = await supabase
+      .from('transactions')
+      .update({ transaction_status: transactionStatus })
       .eq('id', id)
 
     if (error) throw error

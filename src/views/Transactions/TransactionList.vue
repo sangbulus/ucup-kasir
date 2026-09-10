@@ -44,20 +44,16 @@
 
       <!-- Filter Buttons -->
       <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        <!-- Status transaksi -->
-        <button
-          v-for="opt in statusOptions"
-          :key="'st-' + opt.value"
-          @click="statusFilter = opt.value"
-          :class="[
-            'flex-shrink-0 rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors',
-            statusFilter === opt.value
-              ? 'border-brand-500 bg-brand-500 text-white'
-              : 'border-gray-300 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'
-          ]"
-        >
-          {{ opt.label }}
-        </button>
+        <!-- Status transaksi (dropdown) -->
+        <div class="flex-shrink-0 w-36">
+          <SelectField
+            v-model="transactionStatusFilter"
+            :options="transactionStatusOptions"
+            title="Pilih Status Transaksi"
+            placeholder="Semua Status"
+            button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-[11px] font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+          />
+        </div>
 
         <span class="h-4 w-px flex-shrink-0 bg-gray-200 dark:bg-gray-700"></span>
 
@@ -92,14 +88,19 @@
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
             <span
+              v-if="transaction.status === 'void' || transaction.status === 'batal'"
+              class="rounded-full bg-error-100 px-2 py-0.5 text-[10px] font-medium text-error-700 dark:bg-error-900 dark:text-error-400"
+            >
+              Batal
+            </span>
+            <span
+              v-else
               :class="[
                 'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                transaction.status === 'selesai'
-                  ? 'bg-success-100 text-success-700 dark:bg-success-900 dark:text-success-400'
-                  : 'bg-error-100 text-error-700 dark:bg-error-900 dark:text-error-400'
+                transactionStatusBadge(transaction.transaction_status).class
               ]"
             >
-              {{ transaction.status === 'selesai' ? 'Selesai' : 'Batal' }}
+              {{ transactionStatusBadge(transaction.transaction_status).label }}
             </span>
             <button
               @click.stop="toggleExpand(transaction.id)"
@@ -153,6 +154,23 @@
                 Sisa: {{ formatCurrency(transaction.remaining_amount) }}
               </p>
             </div>
+          </div>
+
+          <!-- Status Transaksi (ubah status) -->
+          <div v-if="transaction.status !== 'void' && transaction.status !== 'batal'" class="border-t border-gray-100 pt-2 dark:border-gray-800">
+            <label class="mb-1 block text-[10px] text-gray-500 dark:text-gray-400">Status Transaksi</label>
+            <SelectField
+              :model-value="transaction.transaction_status ?? 'disiapkan'"
+              :options="[
+                { label: 'Disiapkan', value: 'disiapkan' },
+                { label: 'Dikirim', value: 'dikirim' },
+                { label: 'Selesai', value: 'selesai' },
+              ]"
+              title="Pilih Status Transaksi"
+              :disabled="statusUpdatingId === transaction.id"
+              button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              @update:model-value="(value) => changeTransactionStatus(transaction, value as TransactionStatus)"
+            />
           </div>
 
           <div class="flex items-center gap-2 border-t border-gray-100 pt-2 dark:border-gray-800">
@@ -243,19 +261,13 @@
           />
         </div>
         <div class="flex items-center gap-2">
-          <button
-            v-for="opt in statusOptions"
-            :key="'st-' + opt.value"
-            @click="statusFilter = opt.value"
-            :class="[
-              'rounded-lg border px-4 py-2 text-sm font-medium transition-colors',
-              statusFilter === opt.value
-                ? 'border-brand-500 bg-brand-500 text-white'
-                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400'
-            ]"
-          >
-            {{ opt.label }}
-          </button>
+          <SelectField
+            v-model="transactionStatusFilter"
+            :options="transactionStatusOptions"
+            title="Pilih Status Transaksi"
+            placeholder="Semua Status"
+            button-class="flex items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+          />
         </div>
         <div class="flex items-center gap-2">
           <button
@@ -499,10 +511,12 @@ import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import SelectField from '@/components/common/SelectField.vue'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useStoreSettingsStore } from '@/stores/storeSettings'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import type { TransactionStatus } from '@/types/database'
 
 const router = useRouter()
 const transactionsStore = useTransactionsStore()
@@ -520,15 +534,15 @@ const perPage = 10
 
 // Pencarian & filter
 const searchQuery = ref('')
-const statusFilter = ref<'semua' | 'selesai'>('semua')
+const transactionStatusFilter = ref<'semua' | TransactionStatus>('semua')
 const paymentFilter = ref<'semua' | 'lunas' | 'belum_lunas'>('semua')
 
 const filteredTransactions = computed(() => {
   let result = [...transactionsStore.transactions]
 
-  // Filter status transaksi (selesai / batal)
-  if (statusFilter.value !== 'semua') {
-    result = result.filter((t) => t.status === statusFilter.value)
+  // Filter status transaksi (disiapkan / dikirim / selesai)
+  if (transactionStatusFilter.value !== 'semua') {
+    result = result.filter((t) => (t.transaction_status ?? 'disiapkan') === transactionStatusFilter.value)
   }
 
   // Filter status pembayaran (lunas / belum lunas)
@@ -569,15 +583,17 @@ const totalPages = computed(() => {
 })
 
 // Reset ke halaman 1 ketika filter/pencarian berubah
-watch([searchQuery, statusFilter, paymentFilter], () => {
+watch([searchQuery, transactionStatusFilter, paymentFilter], () => {
   currentPage.value = 1
 })
 
-// Opsi filter
-const statusOptions = [
-  { value: 'semua', label: 'Semua' },
+// Opsi filter status transaksi (dropdown)
+const transactionStatusOptions = [
+  { value: 'semua', label: 'Semua Status' },
+  { value: 'disiapkan', label: 'Disiapkan' },
+  { value: 'dikirim', label: 'Dikirim' },
   { value: 'selesai', label: 'Selesai' },
-] as const
+]
 
 const paymentOptions = [
   { value: 'semua', label: 'Semua Bayar' },
@@ -588,14 +604,14 @@ const paymentOptions = [
 const hasActiveFilter = computed(() => {
   return (
     searchQuery.value.trim() !== '' ||
-    statusFilter.value !== 'semua' ||
+    transactionStatusFilter.value !== 'semua' ||
     paymentFilter.value !== 'semua'
   )
 })
 
 const clearFilters = () => {
   searchQuery.value = ''
-  statusFilter.value = 'semua'
+  transactionStatusFilter.value = 'semua'
   paymentFilter.value = 'semua'
 }
 
@@ -647,6 +663,35 @@ const formatCurrency = (value: number) =>
     currency: 'IDR',
     maximumFractionDigits: 0,
   }).format(value || 0)
+
+// Badge & handler status transaksi (disiapkan/dikirim/selesai)
+const transactionStatusBadge = (value?: string) => {
+  switch (value) {
+    case 'dikirim':
+      return { label: 'Dikirim', class: 'bg-warning-100 text-warning-700 dark:bg-warning-900 dark:text-warning-400' }
+    case 'selesai':
+      return { label: 'Selesai', class: 'bg-success-100 text-success-700 dark:bg-success-900 dark:text-success-400' }
+    case 'disiapkan':
+    default:
+      return { label: 'Disiapkan', class: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-400' }
+  }
+}
+
+const statusUpdatingId = ref<string | null>(null)
+
+const changeTransactionStatus = async (transaction: any, value: TransactionStatus) => {
+  if (!value || value === transaction.transaction_status) return
+  statusUpdatingId.value = transaction.id
+  try {
+    await transactionsStore.updateTransactionStatus(transaction.id, value)
+    toast.success('Berhasil!', 'Status transaksi diperbarui')
+  } catch (error: any) {
+    console.error('Error updating transaction status:', error)
+    toast.error('Gagal!', error.message || 'Gagal mengubah status transaksi')
+  } finally {
+    statusUpdatingId.value = null
+  }
+}
 
 const formatPaymentMethod = (value: string) => {
   const methods: Record<string, string> = {

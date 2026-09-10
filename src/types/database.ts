@@ -71,6 +71,9 @@ export interface TransactionPayment {
   created_at: string
 }
 
+/** Status fulfillment transaksi penjualan. */
+export type TransactionStatus = 'disiapkan' | 'dikirim' | 'selesai'
+
 export interface Transaction {
   id: string
   user_id?: string
@@ -88,6 +91,7 @@ export interface Transaction {
   remaining_amount: number
   payment_status: string
   status: string
+  transaction_status: TransactionStatus
   notes?: string
   created_at: string
   updated_at: string

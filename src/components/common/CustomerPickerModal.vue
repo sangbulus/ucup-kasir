@@ -111,6 +111,20 @@
 
             <!-- Customer List -->
             <div class="flex-1 overflow-y-auto px-6 py-4">
+              <!-- Pilih semua (mode multi) -->
+              <label
+                v-if="multi && filteredCustomers.length > 0"
+                class="mb-3 flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <input
+                  type="checkbox"
+                  :checked="allFilteredSelected"
+                  @change="toggleSelectAllFiltered"
+                  class="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                />
+                Pilih Semua ({{ selectedIds.length }}/{{ filteredCustomers.length }})
+              </label>
+
               <div v-if="filteredCustomers.length === 0" class="py-12 text-center">
                 <p class="text-sm text-gray-500 dark:text-gray-400">
                   {{ searchQuery || selectedKecamatan ? 'Customer tidak ditemukan' : 'Tidak ada customer' }}
@@ -132,15 +146,23 @@
                   v-for="customer in filteredCustomers"
                   :key="customer.id"
                   type="button"
-                  @click="selectCustomer(customer)"
+                  @click="onRowClick(customer)"
                   :class="[
                     'w-full flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors',
-                    selectedId === customer.id
+                    isPicked(customer.id)
                       ? 'border-brand-500 bg-brand-50/50 dark:bg-brand-500/10'
                       : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
                   ]"
                 >
-                  <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                  <input
+                    v-if="multi"
+                    type="checkbox"
+                    :checked="isPicked(customer.id)"
+                    @click.stop
+                    @change="togglePick(customer.id)"
+                    class="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                  />
+                  <div v-else class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
                     {{ customer.name.charAt(0).toUpperCase() }}
                   </div>
                   <div class="min-w-0 flex-1">
@@ -154,7 +176,7 @@
                     </p>
                   </div>
                   <svg
-                    v-if="selectedId === customer.id"
+                    v-if="!multi && isPicked(customer.id)"
                     class="h-5 w-5 flex-shrink-0 text-brand-500"
                     fill="none"
                     stroke="currentColor"
@@ -168,7 +190,23 @@
 
             <!-- Footer -->
             <div class="border-t border-gray-200 px-6 py-4 dark:border-gray-700">
+              <template v-if="multi">
+                <button
+                  @click="confirmMulti"
+                  class="mb-2 w-full rounded-lg bg-brand-500 py-3 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="selectedIds.length === 0"
+                >
+                  Tambahkan ({{ selectedIds.length }})
+                </button>
+                <button
+                  @click="close"
+                  class="w-full rounded-lg bg-gray-100 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  Batal
+                </button>
+              </template>
               <button
+                v-else
                 @click="close"
                 class="w-full rounded-lg bg-gray-100 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               >
@@ -192,16 +230,23 @@ interface Props {
   modelValue: boolean
   customers: Customer[]
   selectedId?: string
+  /** Mode multi-pilih (untuk mengisi anggota grup). Default: single-select. */
+  multi?: boolean
+  /** Daftar id yang sudah terpilih saat mode multi dibuka. */
+  initialSelectedIds?: string[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
   selectedId: '',
+  multi: false,
+  initialSelectedIds: () => [],
 })
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   'update:selectedId': [value: string]
   select: [customer: Customer]
+  add: [customers: Customer[]]
 }>()
 
 const router = useRouter()
@@ -209,6 +254,8 @@ const isOpen = ref(props.modelValue)
 const searchQuery = ref('')
 const selectedKecamatan = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
+// id terpilih pada mode multi
+const selectedIds = ref<string[]>([...props.initialSelectedIds])
 
 // Kecamatan filter — input + autocomplete
 const kecamatanQuery = ref('')
@@ -226,6 +273,7 @@ watch(
       kecamatanQuery.value = ''
       showKecamatanOptions.value = false
       activeKecamatanIndex.value = 0
+      selectedIds.value = [...props.initialSelectedIds]
       // Only autofocus on desktop (screen width >= 768px)
       nextTick(() => {
         if (window.innerWidth >= 768) {
@@ -292,6 +340,43 @@ const filteredCustomers = computed(() => {
 const selectCustomer = (customer: Customer) => {
   emit('update:selectedId', customer.id)
   emit('select', customer)
+  close()
+}
+
+// ---- Mode multi-pilih ----
+const isPicked = (id: string) => (props.multi ? selectedIds.value.includes(id) : props.selectedId === id)
+
+const togglePick = (id: string) => {
+  selectedIds.value = selectedIds.value.includes(id)
+    ? selectedIds.value.filter((x) => x !== id)
+    : [...selectedIds.value, id]
+}
+
+const allFilteredSelected = computed(
+  () =>
+    filteredCustomers.value.length > 0 &&
+    filteredCustomers.value.every((c) => selectedIds.value.includes(c.id))
+)
+
+const toggleSelectAllFiltered = () => {
+  const ids = filteredCustomers.value.map((c) => c.id)
+  if (allFilteredSelected.value) {
+    selectedIds.value = selectedIds.value.filter((x) => !ids.includes(x))
+  } else {
+    const set = new Set(selectedIds.value)
+    ids.forEach((id) => set.add(id))
+    selectedIds.value = Array.from(set)
+  }
+}
+
+const onRowClick = (customer: Customer) => {
+  if (props.multi) togglePick(customer.id)
+  else selectCustomer(customer)
+}
+
+const confirmMulti = () => {
+  const picked = props.customers.filter((c) => selectedIds.value.includes(c.id))
+  emit('add', picked)
   close()
 }
 

@@ -186,6 +186,19 @@
                     @input="updatePrice(item, ($event.target as HTMLInputElement).value)"
                     class="w-full rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 focus:border-blue-500 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                   />
+                  <div v-if="item.priceLabel || item.priceOverridden" class="mt-0.5 flex items-center gap-1">
+                    <span
+                      v-if="item.priceLabel"
+                      class="inline-flex items-center rounded bg-emerald-100 px-1.5 py-px text-[9px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                    >{{ item.priceLabel }}</span>
+                    <button
+                      v-if="item.priceOverridden"
+                      type="button"
+                      @click="resetItemPrice(item)"
+                      class="text-[9px] font-medium text-brand-600 underline decoration-dotted underline-offset-2 dark:text-brand-400"
+                      title="Kembalikan ke harga otomatis"
+                    >↺ reset harga</button>
+                  </div>
                 </div>
 
                 <div>
@@ -524,7 +537,17 @@
                         @input="updatePrice(item, ($event.target as HTMLInputElement).value)"
                         class="w-24 rounded-lg border border-gray-300 bg-transparent px-2 py-1.5 text-right text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                       />
+                      <button
+                        v-if="item.priceOverridden"
+                        type="button"
+                        @click="resetItemPrice(item)"
+                        title="Kembalikan ke harga otomatis"
+                        class="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-brand-600 dark:hover:bg-gray-800"
+                      >
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                      </button>
                     </div>
+                    <span v-if="item.priceLabel" class="mt-1 block rounded bg-brand-50 px-1.5 py-0.5 text-right text-[9px] font-semibold text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">{{ item.priceLabel }}</span>
                   </td>
                   <td class="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">
                     {{ formatCurrency(item.subtotal) }}
@@ -755,7 +778,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
@@ -770,6 +793,7 @@ import { useProductsStore } from '@/stores/products'
 import { useCustomersStore } from '@/stores/customers'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useReturnsStore } from '@/stores/returns'
+import { usePriceMatrixStore, type PriceSource } from '@/stores/priceMatrix'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 
@@ -779,6 +803,7 @@ const productsStore = useProductsStore()
 const customersStore = useCustomersStore()
 const transactionsStore = useTransactionsStore()
 const returnsStore = useReturnsStore()
+const priceMatrixStore = usePriceMatrixStore()
 const toast = useToast()
 const { confirm } = useConfirm()
 
@@ -851,6 +876,13 @@ interface CartItem {
   stock: number
   quantity: number
   subtotal: number
+  /** harga normal produk (price_sell) — fallback matriks */
+  normalPrice: number
+  /** true bila kasir mengedit harga manual — tidak akan di-re-resolve */
+  priceOverridden: boolean
+  priceSource: PriceSource
+  /** label kecil indikator sumber harga ("Harga khusus", "Tier: Grosir", …) */
+  priceLabel: string | null
 }
 
 const cartItems = reactive<CartItem[]>([])
@@ -879,8 +911,47 @@ const parseNumber = (value: string) => parseInt(value.replace(/\D/g, '')) || 0
 
 const updatePrice = (item: CartItem, rawValue: string) => {
   item.price = parseNumber(rawValue)
+  item.priceOverridden = true
   item.subtotal = item.price * item.quantity
 }
+
+// ============================================================
+// Integrasi price matrix — resolusi harga otomatis (harga customer
+// → harga grup → tier kuantitas → harga normal). Edit manual kasir
+// ditandai dan tidak pernah ditimpa ulang.
+// ============================================================
+const applyMatrixPrice = (item: CartItem) => {
+  if (item.priceOverridden) return
+  const r = priceMatrixStore.resolvePrice(
+    item.product_id,
+    item.quantity,
+    selectedCustomerId.value,
+    item.normalPrice
+  )
+  item.price = r.price
+  item.priceSource = r.source
+  item.priceLabel =
+    r.source === 'custom' ? 'Harga khusus'
+    : r.source === 'group' ? 'Harga grup'
+    : r.source === 'tier' ? `Tier: ${r.tier_name || 'harga jumlah'}`
+    : null
+}
+
+const repriceAllItems = () => {
+  cartItems.forEach((item) => {
+    applyMatrixPrice(item)
+    item.subtotal = item.price * item.quantity
+  })
+}
+
+const resetItemPrice = (item: CartItem) => {
+  item.priceOverridden = false
+  applyMatrixPrice(item)
+  item.subtotal = item.price * item.quantity
+}
+
+// Ganti customer → semua item non-override ikut harga customer baru
+watch(selectedCustomerId, () => repriceAllItems())
 
 const formatDate = (date: Date) =>
   date.toLocaleDateString('id-ID', {
@@ -949,12 +1020,14 @@ const getQtyDisplay = (item: CartItem) => quantityDrafts.get(item) ?? item.quant
 const decrementQuantity = (item: CartItem) => {
   quantityDrafts.delete(item)
   item.quantity = Math.max(1, item.quantity - 1)
+  applyMatrixPrice(item)
   item.subtotal = item.quantity * item.price
 }
 
 const incrementQuantity = (item: CartItem) => {
   quantityDrafts.delete(item)
   item.quantity = Math.min(item.stock, item.quantity + 1)
+  applyMatrixPrice(item)
   item.subtotal = item.quantity * item.price
 }
 
@@ -987,6 +1060,7 @@ const validateQuantity = (item: CartItem) => {
     item.quantity = item.stock
     toast.warning('Perhatian', `Stok maksimal: ${item.stock}`)
   }
+  applyMatrixPrice(item)
   item.subtotal = item.quantity * item.price
 }
 
@@ -997,16 +1071,24 @@ const handleAddProduct = ({ products, quantity }: { products: any[]; quantity: n
     if (existing) {
       const newQty = Math.min(existing.quantity + quantity, existing.stock)
       existing.quantity = newQty
+      applyMatrixPrice(existing)
       existing.subtotal = newQty * existing.price
     } else {
-      cartItems.push({
+      const newItem: CartItem = {
         product_id: product.id,
         name: product.name,
         price: product.price_sell,
         stock: product.stock,
         quantity: Math.min(quantity, product.stock),
-        subtotal: product.price_sell * Math.min(quantity, product.stock),
-      })
+        subtotal: 0,
+        normalPrice: product.price_sell,
+        priceOverridden: false,
+        priceSource: 'default',
+        priceLabel: null,
+      }
+      applyMatrixPrice(newItem)
+      newItem.subtotal = newItem.price * newItem.quantity
+      cartItems.push(newItem)
     }
     addedCount += 1
   })
@@ -1083,6 +1165,7 @@ const handleSubmit = async () => {
   }
 }
 
+// Ganti customer → semua item non-override ikut harga customer/grup baru
 onMounted(async () => {
   try {
     await Promise.all([
@@ -1093,5 +1176,8 @@ onMounted(async () => {
     console.error('Error loading data:', error)
     toast.error('Gagal!', 'Gagal memuat data produk/customer')
   }
+  // Matriks harga: muat tanpa memblokir — fallback price_sell bila gagal
+  await priceMatrixStore.load()
+  if (priceMatrixStore.loaded && cartItems.length) repriceAllItems()
 })
 </script>

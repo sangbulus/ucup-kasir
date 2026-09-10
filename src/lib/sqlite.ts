@@ -190,6 +190,9 @@ async function migrateSchema(): Promise<void> {
     await addColumnIfMissing('store_settings', 'default_credit_limit', 'REAL NOT NULL DEFAULT 0')
     await addColumnIfMissing('store_settings', 'loading_rate_per_sack', 'REAL NOT NULL DEFAULT 0')
     await addColumnIfMissing('customers', 'credit_limit', 'REAL NOT NULL DEFAULT 0')
+    // Kolom transaction_status (status transaksi: disiapkan/dikirim/selesai).
+    // DB lama dianggap semua transaksinya sudah selesai.
+    await addColumnIfMissing('transactions', 'transaction_status', "TEXT NOT NULL DEFAULT 'disiapkan'")
     // Jabatan kini teks tetap ('supir' | 'loader') — tabel departments/positions dihapus
     await addColumnIfMissing('employees', 'position', 'TEXT')
     await addColumnIfMissing('payroll_components', 'position', 'TEXT')
