@@ -14,7 +14,12 @@ import VueApexCharts from 'vue3-apexcharts'
 import { App as CapacitorApp } from '@capacitor/app'
 import { initSQLite } from '@/lib/sqlite'
 import { isNativeApp } from '@/lib/platform'
+import { installEventLog, logEvent, flushToSQLite } from '@/lib/eventLog'
 import { useNavigationStack } from '@/composables/useNavigationStack'
+
+// Pasang perekam event log SESEDINI MUNGKIN — error WebView/crash yang
+// terjadi setelah titik ini ikut terekam otomatis.
+installEventLog()
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -40,6 +45,9 @@ async function startup() {
   try {
     // 1. Inisialisasi database SQLite lokal
     await initSQLite()
+    logEvent({ level: 'info', source: 'sqlite', event: 'init_ok', message: 'SQLite lokal siap' })
+    // Pindahkan entry yang tertahan di localStorage ke tabel SQLite.
+    await flushToSQLite()
 
     // 2. Cek & upload perubahan yang tertunda (backup harian)
     //    Jalankan setelah app siap (nextTick) supaya tidak blokir render.

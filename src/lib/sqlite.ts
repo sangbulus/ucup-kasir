@@ -1,5 +1,7 @@
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite'
 import { Capacitor } from '@capacitor/core'
+import { logEvent } from '@/lib/eventLog'
+import type { EventLogEntry } from '@/lib/eventLog'
 
 // ============================================================
 // Wrapper SQLite Database
@@ -381,9 +383,14 @@ export async function getDb(): Promise<SQLiteDBConnection> {
 /** Jalankan query SELECT, return array rows. */
 export async function query<T = any>(sql: string, params: (string | number | boolean | null)[] = []): Promise<T[]> {
   const conn = await getDb()
-  // query() TIDAK membungkus transaksi — parameter ketiga adalah isSQL92, bukan transaction.
-  const res = await conn.query(sql, params)
-  return (res.values || []) as T[]
+  try {
+    // query() TIDAK membungkus transaksi — parameter ketiga adalah isSQL92, bukan transaction.
+    const res = await conn.query(sql, params)
+    return (res.values || []) as T[]
+  } catch (e: any) {
+    logEvent({ level: 'error', source: 'sqlite', event: 'query_failed', message: e?.message || String(e), detail: sql })
+    throw e
+  }
 }
 
 /** Jalankan query SELECT, return 1 row atau null. */
@@ -395,11 +402,39 @@ export async function queryOne<T = any>(sql: string, params: (string | number | 
 /** Jalankan INSERT/UPDATE/DELETE, return last inserted id (jika ada). */
 export async function run(sql: string, params: (string | number | boolean | null)[] = []): Promise<{ changes: number; lastId?: number }> {
   const conn = await getDb()
-  // transaction=false: plugin default-nya membungkus setiap run() dalam BEGIN...COMMIT
-  // sendiri. Memakai false membuat statement dieksekusi langsung tanpa transaksi —
-  // transaksi dikelola manual oleh helper transaction() di bawah.
-  const res = await conn.run(sql, params, false)
-  return { changes: res.changes?.changes ?? 0, lastId: res.changes?.lastId }
+  try {
+    // transaction=false: plugin default-nya membungkus setiap run() dalam BEGIN...COMMIT
+    // sendiri. Memakai false membuat statement dieksekusi langsung tanpa transaksi —
+    // transaksi dikelola manual oleh helper transaction() di bawah.
+    const res = await conn.run(sql, params, false)
+    return { changes: res.changes?.changes ?? 0, lastId: res.changes?.lastId }
+  } catch (e: any) {
+    logEvent({ level: 'error', source: 'sqlite', event: 'run_failed', message: e?.message || String(e), detail: sql })
+    throw e
+  }
+}
+
+/**
+ * Simpan entry event log dari buffer localStorage ke tabel app_event_log.
+ * Dipanggil oleh flusher di @/lib/eventLog. INSERT OR IGNORE agar idempoten
+ * (uid sama tidak ditulis ulang). Setelah insert, pangkas baris terlama.
+ */
+export async function saveEventLogEntries(entries: EventLogEntry[]): Promise<void> {
+  const conn = await getDb()
+  for (const e of entries) {
+    await conn.run(
+      `INSERT OR IGNORE INTO app_event_log (uid, ts, level, source, event, message, detail, platform)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [e.uid, e.ts, e.level, e.source, e.event, e.message, e.detail ?? null, e.platform],
+      false
+    )
+  }
+  // Pangkas: simpan maksimal 1000 baris terbaru.
+  await conn.run(
+    `DELETE FROM app_event_log WHERE uid NOT IN (SELECT uid FROM app_event_log ORDER BY ts DESC LIMIT 1000)`,
+    [],
+    false
+  )
 }
 
 /** Executor transaksi: query & run dengan params bernilai nullable */
@@ -435,14 +470,41 @@ export async function transaction<T>(
 
     await conn.commitTransaction()
     return result
-  } catch (e) {
+  } catch (e: any) {
     try {
       await conn.rollbackTransaction()
     } catch {
       // abaikan error rollback
     }
+    logEvent({ level: 'error', source: 'sqlite', event: 'transaction_failed', message: e?.message || String(e) })
     throw e
   }
+}
+
+/** Baca event log dari tabel SQLite (native). Terlama → terbaru. */
+export async function getEventLogFromSqlite(limit = 1000): Promise<EventLogEntry[]> {
+  const rows = await query<any>(
+    `SELECT uid, ts, level, source, event, message, detail, platform
+     FROM app_event_log ORDER BY ts DESC LIMIT ?`,
+    [limit]
+  )
+  return rows
+    .reverse()
+    .map((r) => ({
+      uid: String(r.uid),
+      ts: Number(r.ts),
+      level: r.level,
+      source: r.source,
+      event: String(r.event),
+      message: String(r.message),
+      detail: r.detail ? String(r.detail) : undefined,
+      platform: r.platform,
+    }))
+}
+
+/** Hapus semua isi tabel app_event_log (native). */
+export async function clearEventLogTable(): Promise<void> {
+  await run('DELETE FROM app_event_log')
 }
 
 // ============================================================

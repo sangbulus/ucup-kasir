@@ -711,6 +711,29 @@
         </div>
       </section>
 
+      <!-- Log Event -->
+      <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <button
+          @click="router.push('/settings/event-log')"
+          class="flex w-full items-center justify-between gap-3 p-4 text-left transition active:scale-[0.99]"
+        >
+          <div class="flex items-center gap-3">
+            <svg class="h-5 w-5 text-rose-500 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M9 8h6M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />
+            </svg>
+            <div>
+              <h2 class="font-outfit text-sm font-bold text-gray-900 dark:text-white">
+                Log Event
+              </h2>
+              <p class="mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">Riwayat error &amp; aktivitas (SQLite / Supabase / Sync)</p>
+            </div>
+          </div>
+          <svg class="h-5 w-5 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </section>
+
       <!-- Keluar -->
       <section class="rounded-2xl border border-red-200 bg-white shadow-sm dark:border-red-900/30 dark:bg-white/[0.03]">
         <button

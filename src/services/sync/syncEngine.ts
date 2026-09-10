@@ -14,6 +14,7 @@ import {
 import { getCurrentUserId } from '@/services/sqlite/db'
 import { isOnlineNow } from '@/lib/network'
 import { isNativeApp } from '@/lib/platform'
+import { logEvent, logError } from '@/lib/eventLog'
 import { sqliteCategoriesService } from '@/services/sqlite/categories'
 import { sqliteProductsService } from '@/services/sqlite/products'
 import { sqliteCustomersService } from '@/services/sqlite/customers'
@@ -347,11 +348,14 @@ export async function downloadAllFromSupabase(): Promise<SyncResult> {
     await setMetadata('last_download_at', new Date().toISOString())
     await setMetadata('downloaded_user_id', user.id)
 
+    logEvent({ level: 'info', source: 'sync', event: 'download_ok', message: `Download dari Supabase selesai (${transactions.length} transaksi)` })
+
     return {
       success: true,
       downloaded: categories.length + products.length + customers.length + transactions.length,
     }
   } catch (e: any) {
+    logError('sync', 'download_failed', e, 'Gagal mengunduh data dari Supabase')
     return { success: false, message: e.message || 'Gagal mengunduh data' }
   }
 }
@@ -420,11 +424,21 @@ export async function uploadChangesToSupabase(): Promise<SyncResult> {
       failed++
       if (!firstError) firstError = e.message
       await markSyncQueueFailed(item.id, e.message || 'Gagal upload')
+      logError('sync', 'queue_item_failed', e, `${item.operation} ${item.table_name} (${item.record_id})`)
     }
   }
 
   if (uploaded > 0) {
     await setMetadata('last_sync_at', new Date().toISOString())
+  }
+
+  if (uploaded > 0 || failed > 0) {
+    logEvent({
+      level: failed > 0 ? 'warn' : 'info',
+      source: 'sync',
+      event: 'upload_done',
+      message: `Upload queue selesai: ${uploaded} sukses, ${failed} gagal`,
+    })
   }
 
   return {
@@ -697,8 +711,10 @@ export async function uploadAllToSupabase(): Promise<SyncResult> {
     await markAllSynced(tables)
 
     await setMetadata('last_sync_at', new Date().toISOString())
+    logEvent({ level: 'info', source: 'sync', event: 'backup_full_ok', message: `Backup full selesai: ${uploaded} baris diupload` })
     return { success: true, uploaded }
   } catch (e: any) {
+    logError('sync', 'backup_full_failed', e, 'Backup full gagal')
     return { success: false, message: e.message || 'Gagal backup' }
   }
 }

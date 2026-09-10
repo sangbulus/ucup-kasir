@@ -306,6 +306,21 @@ CREATE TABLE IF NOT EXISTS sync_metadata (
 --   'user_id'           : user yang datanya ada di SQLite
 --   'schema_version'    : versi schema SQLite
 
+-- 17b) Event Log — perekam aktivitas & error aplikasi (LOKAL SAJA,
+--      tidak ikut disinkron ke Supabase). Sumber error: sqlite,
+--      supabase, sync, auth, network, app.
+CREATE TABLE IF NOT EXISTS app_event_log (
+  uid TEXT PRIMARY KEY,          -- id unik dari buffer in-memory
+  ts INTEGER NOT NULL,           -- epoch ms
+  level TEXT NOT NULL,           -- 'info' | 'warn' | 'error'
+  source TEXT NOT NULL,          -- 'sqlite' | 'supabase' | 'sync' | 'auth' | 'network' | 'app'
+  event TEXT NOT NULL,           -- kode event, mis. 'query_failed', 'sync_upload'
+  message TEXT NOT NULL,
+  detail TEXT,                   -- stack trace / JSON opsional
+  platform TEXT NOT NULL         -- 'android' | 'web'
+);
+CREATE INDEX IF NOT EXISTS idx_app_event_log_ts ON app_event_log (ts DESC);
+
 -- ============================================================
 -- Modul Finance — Double-entry Accounting
 -- ============================================================
