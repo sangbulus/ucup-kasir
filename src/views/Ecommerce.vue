@@ -91,42 +91,42 @@
               class="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
               @scroll="handleScroll"
             >
-              <div class="min-w-full snap-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-5 shadow-lg">
+              <div class="min-w-full snap-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-4 shadow-lg">
                 <div class="flex items-start justify-between">
                   <div class="flex-1">
-                    <div class="flex items-center gap-2">
-                      <svg class="h-5 w-5 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="flex items-center gap-1.5">
+                      <svg class="h-4 w-4 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                       </svg>
-                      <span class="text-sm font-medium text-white/90">Kas</span>
+                      <span class="text-xs font-medium text-white/90">Kas</span>
                     </div>
-                    <h3 class="mt-3 text-2xl font-bold text-white">
+                    <h3 class="mt-2 text-lg font-bold text-white">
                       {{ financialHidden ? 'Rp ××××××' : formatCurrency(cashBalance) }}
                     </h3>
-                    <p class="mt-1 text-xs text-white/75">Saldo Tunai</p>
+                    <p class="mt-0.5 text-[10px] text-white/75">Saldo Tunai</p>
                   </div>
-                  <div class="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
-                    <span class="text-lg">💵</span>
+                  <div class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+                    <span class="text-base">💵</span>
                   </div>
                 </div>
               </div>
 
-              <div class="min-w-full snap-center rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 p-5 shadow-lg">
+              <div class="min-w-full snap-center rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 p-4 shadow-lg">
                 <div class="flex items-start justify-between">
                   <div class="flex-1">
-                    <div class="flex items-center gap-2">
-                      <svg class="h-5 w-5 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="flex items-center gap-1.5">
+                      <svg class="h-4 w-4 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                       </svg>
-                      <span class="text-sm font-medium text-white/90">Bank</span>
+                      <span class="text-xs font-medium text-white/90">Bank</span>
                     </div>
-                    <h3 class="mt-3 text-2xl font-bold text-white">
+                    <h3 class="mt-2 text-lg font-bold text-white">
                       {{ financialHidden ? 'Rp ××××××' : formatCurrency(bankBalance) }}
                     </h3>
-                    <p class="mt-1 text-xs text-white/75">Saldo Rekening</p>
+                    <p class="mt-0.5 text-[10px] text-white/75">Saldo Rekening</p>
                   </div>
-                  <div class="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
-                    <span class="text-lg">🏦</span>
+                  <div class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+                    <span class="text-base">🏦</span>
                   </div>
                 </div>
               </div>
