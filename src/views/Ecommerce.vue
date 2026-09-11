@@ -33,12 +33,11 @@
           </router-link>
         </div>
 
-        <!-- Mobile Financial Summary (Penjualan & Laba) -->
+        <!-- Mobile Account Balance Carousel -->
         <div class="md:hidden">
-          <!-- Header dengan tombol toggle -->
           <div class="mb-2 flex items-center justify-between px-1">
             <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Ringkasan Keuangan
+              Saldo Akun
             </span>
             <button
               type="button"
@@ -83,80 +82,65 @@
             </button>
           </div>
 
-          <!-- Kartu keuangan — skeleton hanya saat data laporan dimuat -->
-          <div v-if="loading" class="grid grid-cols-2 gap-3">
-            <LoadingSkeleton type="stats" />
+          <div v-if="loadingAccounts" class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
             <LoadingSkeleton type="stats" />
           </div>
-          <div v-else class="grid grid-cols-2 gap-3">
+          <div v-else class="relative">
             <div
-              class="relative rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]"
+              ref="carouselContainer"
+              class="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+              @scroll="handleScroll"
             >
-              <div class="flex items-center gap-1">
-                <span class="text-[11px] text-gray-500 dark:text-gray-400">Penjualan Bersih</span>
-                <button
-                  type="button"
-                  class="inline-flex cursor-pointer text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                  @click.stop="toggleInfoTooltip('net_sales')"
-                >
-                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <h3 class="mt-1 text-base font-bold text-gray-900 dark:text-white">
-                {{ financialHidden ? 'Rp ××××××' : formatCurrency(salesReportStore.summary.net_sales) }}
-              </h3>
-              <span class="text-[10px] font-medium text-success-500">Bulan Ini</span>
-
-              <transition name="tooltip-fade">
-                <div
-                  v-if="activeInfoTooltip === 'net_sales'"
-                  class="absolute inset-x-2 top-full z-20 mt-2 rounded-lg bg-gray-900 px-3 py-2 text-[10px] font-normal leading-relaxed text-gray-100 shadow-lg dark:bg-gray-700"
-                >
-                  Total pendapatan dari transaksi setelah dikurangi diskon dan retur, belum dipotong biaya operasional.
+              <div class="min-w-full snap-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-4 shadow-lg">
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-1.5">
+                      <svg class="h-4 w-4 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <span class="text-xs font-medium text-white/90">Kas</span>
+                    </div>
+                    <h3 class="mt-2 text-lg font-bold text-white">
+                      {{ financialHidden ? 'Rp ××××××' : formatCurrency(cashBalance) }}
+                    </h3>
+                    <p class="mt-0.5 text-[10px] text-white/75">Saldo Tunai</p>
+                  </div>
+                  <div class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+                    <span class="text-base">💵</span>
+                  </div>
                 </div>
-              </transition>
+              </div>
+
+              <div class="min-w-full snap-center rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 p-4 shadow-lg">
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-1.5">
+                      <svg class="h-4 w-4 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                      <span class="text-xs font-medium text-white/90">Bank</span>
+                    </div>
+                    <h3 class="mt-2 text-lg font-bold text-white">
+                      {{ financialHidden ? 'Rp ××××××' : formatCurrency(bankBalance) }}
+                    </h3>
+                    <p class="mt-0.5 text-[10px] text-white/75">Saldo Rekening</p>
+                  </div>
+                  <div class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+                    <span class="text-base">🏦</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div
-              class="relative rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]"
-            >
-              <div class="flex items-center gap-1">
-                <span class="text-[11px] text-gray-500 dark:text-gray-400">Laba Bersih</span>
-                <button
-                  type="button"
-                  class="inline-flex cursor-pointer text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                  @click.stop="toggleInfoTooltip('net_profit')"
-                >
-                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <h3 class="mt-1 text-base font-bold text-gray-900 dark:text-white">
-                {{ financialHidden ? 'Rp ××××××' : formatCurrency(salesReportStore.summary.net_profit) }}
-              </h3>
-              <span class="text-[10px] text-gray-400 dark:text-gray-500">Keuntungan Riil</span>
-
-              <transition name="tooltip-fade">
-                <div
-                  v-if="activeInfoTooltip === 'net_profit'"
-                  class="absolute inset-x-2 top-full z-20 mt-2 rounded-lg bg-gray-900 px-3 py-2 text-[10px] font-normal leading-relaxed text-gray-100 shadow-lg dark:bg-gray-700"
-                >
-                  Penjualan bersih dikurangi HPP (modal) dan biaya operasional. Ini keuntungan riil Anda.
-                </div>
-              </transition>
+            <div class="mt-3 flex justify-center gap-1.5">
+              <button
+                v-for="idx in 2"
+                :key="idx"
+                type="button"
+                class="h-1.5 rounded-full transition-all"
+                :class="currentCardIndex === idx - 1 ? 'w-6 bg-brand-500' : 'w-1.5 bg-gray-300 dark:bg-gray-600'"
+                @click="scrollToCard(idx - 1)"
+              />
             </div>
           </div>
         </div>
@@ -408,6 +392,7 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useAuthStore } from '@/stores/auth'
 import { useSalesReportStore } from '@/stores/salesReport'
 import { useNotificationsStore } from '@/stores/notifications'
+import { useFinanceStore } from '@/stores/finance'
 import {
   QUICK_MENU_GROUPS,
   GROUP_MAP,
@@ -420,14 +405,37 @@ const categoriesStore = useCategoriesStore()
 const authStore = useAuthStore()
 const salesReportStore = useSalesReportStore()
 const notificationsStore = useNotificationsStore()
+const financeStore = useFinanceStore()
 
 const loading = ref(true)
+const loadingAccounts = ref(true)
 const activeInfoTooltip = ref<string | null>(null)
 const financialHidden = ref(localStorage.getItem('dashboard_financial_hidden') === 'true')
+const carouselContainer = ref<HTMLElement | null>(null)
+const currentCardIndex = ref(0)
 
 const toggleFinancialVisibility = () => {
   financialHidden.value = !financialHidden.value
   localStorage.setItem('dashboard_financial_hidden', String(financialHidden.value))
+}
+
+const cashBalance = ref(0)
+const bankBalance = ref(0)
+
+const handleScroll = () => {
+  if (!carouselContainer.value) return
+  const scrollLeft = carouselContainer.value.scrollLeft
+  const cardWidth = carouselContainer.value.offsetWidth
+  currentCardIndex.value = Math.round(scrollLeft / cardWidth)
+}
+
+const scrollToCard = (index: number) => {
+  if (!carouselContainer.value) return
+  const cardWidth = carouselContainer.value.offsetWidth
+  carouselContainer.value.scrollTo({
+    left: index * cardWidth,
+    behavior: 'smooth'
+  })
 }
 
 const displayName = computed(() => {
@@ -531,6 +539,7 @@ onMounted(async () => {
       categoriesStore.fetchCategories(),
       salesReportStore.fetchSalesReport(),
       notificationsStore.fetchNotifications(),
+      loadAccountBalances(),
     ])
   } catch (error) {
     console.error('Error loading dashboard:', error)
@@ -538,6 +547,25 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+const loadAccountBalances = async () => {
+  loadingAccounts.value = true
+  try {
+    const balances = await financeStore.getAccountBalances()
+
+    const cashAccount = balances.find(b => b.account_code === '1-1001' || b.account_name.toLowerCase().includes('kas'))
+    const bankAccount = balances.find(b => b.account_code === '1-1002' || b.account_name.toLowerCase().includes('bank'))
+
+    cashBalance.value = cashAccount?.balance || 0
+    bankBalance.value = bankAccount?.balance || 0
+  } catch (error) {
+    console.error('Error loading account balances:', error)
+    cashBalance.value = 0
+    bankBalance.value = 0
+  } finally {
+    loadingAccounts.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -548,5 +576,14 @@ onMounted(async () => {
 .tooltip-fade-enter-from,
 .tooltip-fade-leave-to {
   opacity: 0;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 </style>
