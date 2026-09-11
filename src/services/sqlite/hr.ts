@@ -815,6 +815,21 @@ export const sqliteHrService = {
 
     await addToSyncQueue('UPDATE', 'payroll_periods', periodId, { id: periodId, status: 'paid', paid_at: now })
 
+    // Queue jurnal payroll (header + lines via embedded self-heal syncEngine)
+    // dan status tiap payroll yang baru jadi 'paid'.
+    const { sqliteFinanceService } = await import('./finance')
+    const journal = await sqliteFinanceService.getJournal(journalId)
+    if (journal) {
+      await addToSyncQueue('INSERT', 'journal_entries', journalId, journal)
+    }
+    const paidPayrolls = await query<any>(
+      `SELECT id FROM payrolls WHERE period_id = ? AND user_id = ?`,
+      [periodId, userId]
+    )
+    for (const pp of paidPayrolls) {
+      await addToSyncQueue('UPDATE', 'payrolls', pp.id, { id: pp.id, status: 'paid', updated_at: now })
+    }
+
     return journalId
   },
 
@@ -1109,9 +1124,31 @@ export const sqliteHrService = {
         appliedCount++
         appliedAmount += toPay
 
-        await addToSyncQueue('INSERT', 'employee_loan_payments', paymentId, { id: paymentId })
-        await addToSyncQueue('UPDATE', 'employee_loans', loan.id, { id: loan.id })
-        await addToSyncQueue('INSERT', 'payroll_items', itemId, { id: itemId })
+        // Payload lengkap — versi `{ id }` saja selalu ditolak server
+        // (kolom NOT NULL kosong) dan jadi poison item di queue.
+        await addToSyncQueue('INSERT', 'employee_loan_payments', paymentId, {
+          id: paymentId,
+          loan_id: loan.id,
+          payroll_id: p.id,
+          payment_date: now.split('T')[0],
+          amount: toPay,
+          notes: 'Potongan otomatis dari payroll',
+          created_at: now,
+        })
+        await addToSyncQueue('UPDATE', 'employee_loans', loan.id, {
+          id: loan.id,
+          remaining_amount: (Number(loan.remaining_amount) || 0) - toPay,
+          status: (Number(loan.remaining_amount) || 0) - toPay <= 0 ? 'paid' : loan.status,
+          updated_at: now,
+        })
+        await addToSyncQueue('INSERT', 'payroll_items', itemId, {
+          id: itemId,
+          payroll_id: p.id,
+          component_name: 'Potongan Kasbon',
+          component_type: 'potongan',
+          amount: toPay,
+          created_at: now,
+        })
       }
 
       // Update payroll total

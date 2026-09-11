@@ -317,9 +317,10 @@ export const sqliteTransactionsService = {
         now
       )
     }).then(async () => {
-      // Queue header transaksi (items/stock movements ikut terqueue sebagai payload)
+      // Queue header transaksi (items/payments ikut di payload →
+      // di-queue sebagai baris anak oleh syncEngine saat upload)
       const txn = await this.getById(txnId)
-      await addToSyncQueue('INSERT', 'transactions', txnId, txn || { id: txnId })
+      if (txn) await addToSyncQueue('INSERT', 'transactions', txnId, txn)
 
       // Queue jurnal otomatis (header + lines) agar ikut tersinkron
       if (autoJournalId) {

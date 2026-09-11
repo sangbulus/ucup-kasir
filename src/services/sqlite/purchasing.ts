@@ -264,6 +264,11 @@ export const sqlitePurchasingService = {
 
     const created = await this.getPurchaseOrder(id)
     if (created) await addToSyncQueue('INSERT', 'purchase_orders', id, created)
+    // Queue baris po_items secara eksplisit — tanpa ini server tidak pernah
+    // punya po_items, sehingga grn_items.po_item_id selalu gagal FK (23503).
+    for (const it of await this.fetchPOItems(id)) {
+      await addToSyncQueue('INSERT', 'po_items', it.id, it)
+    }
     return created!
   },
 

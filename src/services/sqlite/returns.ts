@@ -202,9 +202,9 @@ export const sqliteReturnsService = {
         now
       )
     }).then(async () => {
-      // Queue retur (items ikut sebagai payload)
+      // Queue retur (items ikut sebagai payload → di-queue syncEngine saat upload)
       const created = await this.getById(returnId)
-      await addToSyncQueue('INSERT', 'returns', returnId, created || { id: returnId })
+      if (created) await addToSyncQueue('INSERT', 'returns', returnId, created)
       // Header transaksi juga berubah
       const txn = await this.getById(transactionId)
       if (txn) await addToSyncQueue('UPDATE', 'transactions', transactionId, txn)
@@ -361,6 +361,7 @@ export const sqliteReturnsService = {
       product_id: r.product_id ?? undefined,
       product_name: r.product_name,
       price: r.price,
+      price_buy: r.price_buy,
       quantity: r.quantity,
       subtotal: r.subtotal,
       created_at: r.created_at,

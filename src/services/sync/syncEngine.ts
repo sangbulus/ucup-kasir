@@ -6,6 +6,7 @@ import {
   setMetadata,
   getMetadata,
   getSyncQueue,
+  addToSyncQueue,
   removeFromSyncQueue,
   markSyncQueueFailed,
   disableForeignKeys,
@@ -96,6 +97,7 @@ export interface SyncResult {
   downloaded?: number
   uploaded?: number
   failed?: number
+  dropped?: number
   message?: string
 }
 
@@ -413,31 +415,72 @@ export async function uploadChangesToSupabase(): Promise<SyncResult> {
 
   let uploaded = 0
   let failed = 0
+  let dropped = 0
   let firstError: string | null = null
 
-  for (const item of queue) {
-    try {
-      await processQueueItem(item)
-      await removeFromSyncQueue(item.id)
-      uploaded++
-    } catch (e: any) {
-      failed++
-      if (!firstError) firstError = e.message
-      await markSyncQueueFailed(item.id, e.message || 'Gagal upload')
-      logError('sync', 'queue_item_failed', e, `${item.operation} ${item.table_name} (${item.record_id})`)
+  // Ronde tambahan: item yang di-defer (FK) dicoba ulang setelah induknya
+  // naik, dan item baru yang di-enqueue selama ronde (recovery payload,
+  // anak embedded, induk hasil heal FK) ikut diproses pada sync yang sama.
+  let pending = queue
+  let maxSeenId = queue.reduce((m, i) => Math.max(m, i.id), 0)
+  let round = 0
+  const MAX_DEFER_ROUNDS = 3
+
+  while (pending.length > 0 && round <= MAX_DEFER_ROUNDS) {
+    const deferredNextRound: SyncQueueItem[] = []
+    for (const item of pending) {
+      try {
+        await processQueueItem(item)
+        await removeFromSyncQueue(item.id)
+        uploaded++
+        await markLocalRowSynced(item.table_name, item.record_id)
+        // Self-heal: parent naik — queue anak yang menumpang di payload
+        // (mis. jurnal lama yang menyimpan `lines`, dsb.) agar ikut ke Supabase.
+        try {
+          await queueEmbeddedChildren(item, JSON.parse(item.payload))
+        } catch {
+          /* payload rusak sudah ditangani di processQueueItem */
+        }
+      } catch (e: any) {
+        const handled = await handleQueueFailure(item, e, deferredNextRound)
+        if (handled === 'deferred' || handled === 'dropped') {
+          if (handled === 'dropped') dropped++
+          continue
+        }
+        failed++
+        if (!firstError) firstError = e?.message
+        await markSyncQueueFailed(item.id, e?.message || 'Gagal upload')
+        logError('sync', 'queue_item_failed', e, `${item.operation} ${item.table_name} (${item.record_id})`)
+      }
     }
+    // Ambil item yang baru masuk queue selama ronde ini (di luar snapshot awal).
+    let fresh: SyncQueueItem[] = []
+    try {
+      fresh = (await getSyncQueue()).filter((i) => i.id > maxSeenId)
+    } catch {
+      fresh = []
+    }
+    if (fresh.length > 0) {
+      maxSeenId = fresh.reduce((m, i) => Math.max(m, i.id), maxSeenId)
+    }
+    const next = [...fresh, ...deferredNextRound]
+    if (next.length === 0) break
+    pending = next
+    round++
   }
+  // Item defer yang masih tersisa tetap di queue DB (retry_count sudah naik)
+  // → dicoba lagi sync berikutnya sampai batas MAX_FK_DEFER_ATTEMPTS.
 
   if (uploaded > 0) {
     await setMetadata('last_sync_at', new Date().toISOString())
   }
 
-  if (uploaded > 0 || failed > 0) {
+  if (uploaded > 0 || failed > 0 || dropped > 0) {
     logEvent({
-      level: failed > 0 ? 'warn' : 'info',
+      level: failed > 0 || dropped > 0 ? 'warn' : 'info',
       source: 'sync',
       event: 'upload_done',
-      message: `Upload queue selesai: ${uploaded} sukses, ${failed} gagal`,
+      message: `Upload queue selesai: ${uploaded} sukses, ${failed} gagal, ${dropped} dibuang`,
     })
   }
 
@@ -445,15 +488,323 @@ export async function uploadChangesToSupabase(): Promise<SyncResult> {
     success: failed === 0,
     uploaded,
     failed,
+    dropped,
     message: firstError || undefined,
   }
 }
 
+// ============================================================
+// Penanganan kegagalan item queue (self-healing)
+//
+// Tiga kelas error dari Supabase (PostgREST/PG):
+//   1. NOT NULL (23502) — payload tidak lengkap (bug versi lama, mis.
+//      journal_entries tanpa description). Payload-{id} seperti ini akan
+//      gagal selamanya → "poison item". Aksi: coba recovery dengan menarik
+//      baris terbaru dari SQLite; kalau masih tidak bisa → drop dari queue
+//      + tandai sync_status baris lokal 'failed' + catat ke event log.
+//   2. FOREIGN KEY (23503) — baris induk belum sampai ke server (mis.
+//      grn_items sebelum po_items ada). Aksi: defer — pindah ke ekor queue,
+//      beri kesempatan item induk naik dulu di ronde ini.
+//   3. Lainnya (network, auth, dll) — biarkan retry_count++ seperti biasa.
+// ============================================================
+
+/** Relasi FK tabel anak → induk (satu anak bisa punya >1 FK induk). */
+const CHILD_FK_RELS: Record<string, Array<{ col: string; parent: string }>> = {
+  journal_lines: [{ col: 'journal_id', parent: 'journal_entries' }],
+  transaction_items: [{ col: 'transaction_id', parent: 'transactions' }],
+  transaction_payments: [{ col: 'transaction_id', parent: 'transactions' }],
+  return_items: [{ col: 'return_id', parent: 'returns' }],
+  stock_opname_items: [{ col: 'opname_id', parent: 'stock_opnames' }],
+  grn_items: [
+    { col: 'grn_id', parent: 'goods_receipts' },
+    { col: 'po_item_id', parent: 'po_items' },
+  ],
+  pi_items: [
+    { col: 'pi_id', parent: 'purchase_invoices' },
+    { col: 'grn_item_id', parent: 'grn_items' },
+  ],
+  pi_payments: [{ col: 'pi_id', parent: 'purchase_invoices' }],
+  purchase_return_items: [{ col: 'pr_id', parent: 'purchase_returns' }],
+  payroll_items: [{ col: 'payroll_id', parent: 'payrolls' }],
+  employee_loan_payments: [
+    { col: 'loan_id', parent: 'employee_loans' },
+    { col: 'payroll_id', parent: 'payrolls' },
+  ],
+  delivery_items: [{ col: 'delivery_order_id', parent: 'delivery_orders' }],
+  delivery_tracking: [{ col: 'delivery_order_id', parent: 'delivery_orders' }],
+  delivery_order_transactions: [{ col: 'delivery_order_id', parent: 'delivery_orders' }],
+  delivery_load_items: [{ col: 'delivery_order_id', parent: 'delivery_orders' }],
+  customer_group_members: [
+    { col: 'group_id', parent: 'customer_groups' },
+    { col: 'customer_id', parent: 'customers' },
+  ],
+}
+
+function classifyQueueError(e: any): 'notnull' | 'foreignkey' | 'unknown' | 'other' {
+  const code = String(e?.code || '')
+  const msg = String(e?.message || '')
+  if (code === '23502' || /null value in column/i.test(msg)) return 'notnull'
+  if (code === '23503' || /foreign key/i.test(msg)) return 'foreignkey'
+  // Payload tidak bisa di-parse / tabel tak dikenal → mustahil pernah sukses.
+  if (e instanceof SyntaxError || /Tabel tidak dikenal|Unexpected (token|end)|JSON/i.test(msg)) return 'unknown'
+  return 'other'
+}
+
+/** Nama kolom yang jadi penyebab error not-null (dari pesan PostgREST). */
+function notNullColumn(e: any): string | null {
+  const m = /null value in column "([^"]+)"/i.exec(String(e?.message || ''))
+  return m ? m[1] : null
+}
+
+/** Berhasil naik ke server → sinkronkan status baris lokal. */
+async function markLocalRowSynced(table: string, recordId: string): Promise<void> {
+  try {
+    await run(
+      `UPDATE "${table}" SET sync_status = 'synced' WHERE id = ?`,
+      [recordId]
+    )
+  } catch {
+    /* tabel mungkin tidak ada di skema lokal — abaikan */
+  }
+}
+
+/**
+ * Recovery payload not-null: tarik baris terbaru dari SQLite sebagai INSERT
+ * penuh (upsert by id di server → aman menimpa baris setengah jadi).
+ */
+async function recoverQueueItemPayload(item: SyncQueueItem): Promise<boolean> {
+  const { table_name, record_id } = item
+  if (!/^[\w-]+$/.test(record_id)) return false
+  if (!/^[\w-]+$/.test(table_name)) return false
+  try {
+    const rows = await query<Record<string, any>>(
+      `SELECT * FROM "${table_name}" WHERE id = ?`,
+      [record_id]
+    )
+    if (rows.length === 0) return false
+    await addToSyncQueue('INSERT', table_name, record_id, rows[0])
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Drop item permanen dari queue + tandai baris lokal + catat event. */
+async function dropQueueItem(item: SyncQueueItem, reason: string): Promise<void> {
+  try {
+    await removeFromSyncQueue(item.id)
+  } catch {
+    /* sudah hilang */
+  }
+  try {
+    if (/^[\w-]+$/.test(item.table_name)) {
+      await run(
+        `UPDATE "${item.table_name}" SET sync_status = 'failed' WHERE id = ?`,
+        [item.record_id]
+      )
+    }
+  } catch {
+    /* baris lokal mungkin sudah terhapus */
+  }
+  logEvent({
+    level: 'warn',
+    source: 'sync',
+    event: 'queue_item_dropped',
+    message: `Item queue dibuang (${item.operation} ${item.table_name} ${item.record_id}): ${reason}`,
+  })
+}
+
+/**
+ * Handler kegagalan satu item. Return:
+ *   'deferred' → sudah dipindah ke deferredNextRound (coba lagi ronde berikutnya)
+ *   'dropped'  → sudah dibuang permanen
+ *   'retry'    → biarkan jalur kegagalan biasa (retry_count++)
+ */
+async function handleQueueFailure(
+  item: SyncQueueItem,
+  e: any,
+  deferredNextRound: SyncQueueItem[]
+): Promise<'deferred' | 'dropped' | 'retry'> {
+  const kind = classifyQueueError(e)
+
+  if (kind === 'unknown') {
+    // Tabel tidak dikenal oleh engine → mustahil pernah sukses.
+    await dropQueueItem(item, e?.message || 'tabel tidak dikenal')
+    return 'dropped'
+  }
+
+  if (kind === 'notnull') {
+    // Payload cacat (warisan versi lama). Kalau operasi DELETE, tidak ada
+    // kolom wajib → kemungkinan besar baris lokal sudah hilang; drop saja.
+    if (item.operation === 'DELETE') {
+      await dropQueueItem(item, e?.message || 'not-null')
+      return 'dropped'
+    }
+    const recovered = await recoverQueueItemPayload(item)
+    await removeFromSyncQueue(item.id)
+    if (recovered) {
+      logEvent({
+        level: 'info',
+        source: 'sync',
+        event: 'queue_item_recovered',
+        message: `Payload ${item.table_name} ${item.record_id} dipulihkan dari data lokal (upload ulang di sync berikutnya)`,
+      })
+    } else {
+      await dropQueueItem(item, `${e?.message || 'not-null'} — data lokal tidak ditemukan`)
+      return 'dropped'
+    }
+    return 'dropped'
+  }
+
+  if (kind === 'foreignkey') {
+    // Induk belum ada di server (data warisan sebelum tabel induk di-queue).
+    // Batasi percobaan lintas-sync (retry_count) agar tidak defer selamanya.
+    const attempts = (item.retry_count || 0) + 1
+    if (attempts > MAX_FK_DEFER_ATTEMPTS) {
+      await dropQueueItem(item, `foreign key: ${e?.message || ''}`.trim())
+      return 'dropped'
+    }
+    const healed = await healForeignKey(item, attempts)
+    if (healed === 'dropped') return 'dropped'
+    if (healed === 'requeued') {
+      // Item versi utuh sudah di-queue ulang di ekor DB (retry_count ikut
+      // dipindahkan) → akan tertangkap oleh "fresh fetch" ronde berikutnya.
+      return 'deferred'
+    }
+    // Recovery tidak mungkin (baris/tabel lokal tak ada) — fallback lama:
+    // naikkan retry_count di DB + coba lagi di memori ronde ini.
+    await markSyncQueueFailed(item.id, e?.message || 'foreign key')
+    deferredNextRound.push({ ...item, retry_count: attempts })
+    return 'deferred'
+  }
+
+  return 'retry'
+}
+
+const MAX_FK_DEFER_ATTEMPTS = 8
+
+/**
+ * Saat FK gagal: pastikan rantai induk ikut di-queue (INSERT dari data lokal,
+ * idempoten) sehingga ronde berikutnya menemukan induk yang sudah naik.
+ * Item anak itu sendiri TIDAK di-queue ulang — ia tetap di queue (dipindah
+ * ke ekor oleh defer) agar tidak terjadi amplifikasi item.
+ */
+async function healForeignKey(
+  item: SyncQueueItem,
+  attempts: number
+): Promise<'requeued' | 'dropped' | 'none'> {
+  const rels = CHILD_FK_RELS[item.table_name]
+  if (!rels || !/^[\w-]+$/.test(item.table_name)) return 'none'
+  try {
+    const rows = await query<Record<string, any>>(
+      `SELECT * FROM "${item.table_name}" WHERE id = ?`,
+      [item.record_id]
+    )
+    if (rows.length === 0) {
+      // Baris lokal sudah hilang → operasi ini tidak akan pernah sukses.
+      if (item.operation === 'DELETE') await dropQueueItem(item, 'baris lokal tidak ada lagi')
+      return item.operation === 'DELETE' ? 'dropped' : 'none'
+    }
+    const child = rows[0]
+    for (const rel of rels) {
+      const parentId = child[rel.col]
+      if (!parentId) continue
+      await ensureParentQueued(rel.parent, String(parentId))
+    }
+    // Hapus versi lama (payload cacat) dari queue lalu sisipkan ulang dengan
+    // payload utuh di ekor — SETELAH item induk di-queue, agar urutan INSERT
+    // benar saat fresh-fetch ronde berikutnya. retry_count ikut dipindahkan
+    // supaya batas MAX_FK_DEFER_ATTEMPTS lintas-sync tetap terhitung.
+    await removeFromSyncQueue(item.id)
+    await addToSyncQueue('INSERT', item.table_name, item.record_id, child)
+    const maxRows = await query<{ mid: number | null }>(
+      `SELECT MAX(id) AS mid FROM sync_queue WHERE table_name = ? AND record_id = ?`,
+      [item.table_name, item.record_id]
+    )
+    const newId = maxRows[0]?.mid
+    if (newId != null) {
+      await run(`UPDATE sync_queue SET retry_count = ? WHERE id = ?`, [attempts, newId])
+    }
+    if (attempts > MAX_FK_DEFER_ATTEMPTS / 2) {
+      logEvent({
+        level: 'warn',
+        source: 'sync',
+        event: 'fk_defer',
+        message: `Menunggu induk untuk ${item.table_name} ${item.record_id} (percobaan ${attempts}/${MAX_FK_DEFER_ATTEMPTS})`,
+      })
+    }
+    return 'requeued'
+  } catch {
+    /* tabel lokal tidak ada — biarkan retry biasa */
+    return 'none'
+  }
+}
+
+/** Queue INSERT induk dari SQLite bila ada di lokal (idempotent). */
+async function ensureParentQueued(parentTable: string, parentId: string): Promise<void> {
+  if (!/^[\w-]+$/.test(parentTable)) return
+  try {
+    const rows = await query<Record<string, any>>(
+      `SELECT * FROM "${parentTable}" WHERE id = ?`,
+      [parentId]
+    )
+    if (rows.length > 0) {
+      await addToSyncQueue('INSERT', parentTable, parentId, rows[0])
+    }
+  } catch {
+    /* induk tidak ada di lokal — anak akan di-drop setelah batas percobaan */
+  }
+}
+
+/**
+ * Self-heal pasca-sukses: payload parent kadang menyimpan array anak
+ * (`lines` jurnal, `items` PO/GRN/opname/transaksi/retur) yang dibuang
+ * sanitizeForSupabase. Queue anak-anak itu sekarang agar benar-benar naik.
+ */
+async function queueEmbeddedChildren(item: SyncQueueItem, data: any): Promise<void> {
+  if (!data || typeof data !== 'object' || item.operation === 'DELETE') return
+  const childTables = CHILD_EMBEDDED_KEYS[item.table_name]
+  if (!childTables) return
+  for (const { key, table, parentCol } of childTables) {
+    const arr = data[key]
+    if (!Array.isArray(arr)) continue
+    for (const row of arr) {
+      if (!row || typeof row !== 'object') continue
+      if (!row.id || typeof row.id !== 'string') continue
+      try {
+        // Lengkapi FK induk bila baris anak hasil JOIN tidak membawanya.
+        const child = { ...row }
+        if (!(parentCol in child) && data.id) child[parentCol] = data.id
+        await addToSyncQueue('INSERT', table, String(row.id), child)
+      } catch {
+        /* satu anak gagal jangan hentikan sisanya */
+      }
+    }
+  }
+}
+
+/** Petakan key array di payload parent → tabel anak + kolom induknya. */
+const CHILD_EMBEDDED_KEYS: Record<string, Array<{ key: string; table: string; parentCol: string }>> = {
+  journal_entries: [{ key: 'lines', table: 'journal_lines', parentCol: 'journal_id' }],
+  purchase_orders: [{ key: 'items', table: 'po_items', parentCol: 'po_id' }],
+  goods_receipts: [{ key: 'items', table: 'grn_items', parentCol: 'grn_id' }],
+  purchase_invoices: [
+    { key: 'items', table: 'pi_items', parentCol: 'pi_id' },
+    { key: 'payments', table: 'pi_payments', parentCol: 'pi_id' },
+  ],
+  purchase_returns: [{ key: 'items', table: 'purchase_return_items', parentCol: 'pr_id' }],
+  transactions: [
+    { key: 'items', table: 'transaction_items', parentCol: 'transaction_id' },
+    { key: 'payments', table: 'transaction_payments', parentCol: 'transaction_id' },
+  ],
+  returns: [{ key: 'items', table: 'return_items', parentCol: 'return_id' }],
+  stock_opnames: [{ key: 'items', table: 'stock_opname_items', parentCol: 'opname_id' }],
+  payrolls: [{ key: 'items', table: 'payroll_items', parentCol: 'payroll_id' }],
+  delivery_orders: [{ key: 'items', table: 'delivery_items', parentCol: 'delivery_order_id' }],
+}
+
 /**
  * Proses satu item queue: jalankan operasi ke Supabase.
- * Order penting: categories → products → customers → transactions → returns → lainnya.
- * Table yang diupdate dari parent juga ikut di-proses di sini (misal update stock
- * produk setelah transaksi — sudah ditangani karena products di-queue saat stok berubah).
  */
 async function processQueueItem(item: SyncQueueItem): Promise<void> {
   const { table_name, operation, record_id, payload } = item
