@@ -100,10 +100,22 @@
               <SelectField v-model="form.employee_id" label="Karyawan" placeholder="Pilih karyawan" :options="activeEmployeeOptions" required />
               <DateField v-model="form.period_start" label="Tanggal Mulai Periode" required />
               <DateField v-model="form.period_end" label="Tanggal Akhir Periode" required />
-              <InputField v-model="form.base_salary" type="number" label="Gaji Pokok" placeholder="0" required />
-              <InputField v-model="form.total_allowance" type="number" label="Total Tunjangan" placeholder="0" />
-              <InputField v-model="form.total_deduction" type="number" label="Total Potongan" placeholder="0" />
-              <InputField v-model="form.notes" label="Catatan" placeholder="Catatan (opsional)" />
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Gaji Pokok <span class="text-red-500">*</span></label>
+                <input v-model="form.base_salary" type="number" placeholder="0" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Total Tunjangan</label>
+                <input v-model="form.total_allowance" type="number" placeholder="0" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Total Potongan</label>
+                <input v-model="form.total_deduction" type="number" placeholder="0" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Catatan</label>
+                <input v-model="form.notes" type="text" placeholder="Catatan (opsional)" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+              </div>
             </div>
           </div>
           <div class="flex gap-2 border-t border-gray-200 p-4 dark:border-gray-700">
@@ -126,7 +138,7 @@ import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import SelectField from '@/components/common/SelectField.vue'
 import DateField from '@/components/common/DateField.vue'
-import InputField from '@/components/common/InputField.vue'
+
 import { useHrStore } from '@/stores/hr'
 import type { Payroll, PayrollInsert } from '@/types/database'
 
