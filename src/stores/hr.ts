@@ -12,18 +12,14 @@ import type {
   PayrollComponent,
   PayrollComponentInsert,
   PayrollComponentUpdate,
-  PayrollPeriod,
-  PayrollPeriodInsert,
-  PayrollPeriodUpdate,
   Payroll,
-  PayrollSummary,
+  PayrollInsert,
+  PayrollUpdate,
   EmployeeLoan,
   EmployeeLoanInsert,
   EmployeeLoanUpdate,
   EmployeeLoanPayment,
   EmployeeLoanPaymentInsert,
-  KasbonChoice,
-  KasbonDeductionResult,
 } from '@/types/database'
 
 // ============================================================
@@ -32,7 +28,7 @@ import type {
 // - Absensi
 // - Komponen Payroll
 // - Kasbon (employee_loans)
-// - Periode Payroll & Slip Gaji
+// - Payroll per-karyawan (periode individual)
 // ============================================================
 
 export const useHrStore = defineStore('hr', () => {
@@ -43,9 +39,7 @@ export const useHrStore = defineStore('hr', () => {
   const employeesWithStats = ref<EmployeeWithStats[]>([])
   const attendance = ref<Attendance[]>([])
   const payrollComponents = ref<PayrollComponent[]>([])
-  const payrollPeriods = ref<PayrollPeriod[]>([])
   const payrolls = ref<Payroll[]>([])
-  const payrollSummary = ref<PayrollSummary[]>([])
   const employeeLoans = ref<EmployeeLoan[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -290,88 +284,14 @@ export const useHrStore = defineStore('hr', () => {
   }
 
   // ============================================================
-  // PAYROLL PERIODS & PAYROLLS
+  // PAYROLLS (Per-Karyawan dengan Periode Individual)
   // ============================================================
 
-  async function fetchPayrollPeriods() {
+  async function fetchPayrolls(employeeId?: string) {
     loading.value = true
     error.value = null
     try {
-      payrollPeriods.value = await hrServiceAdapter.fetchPayrollPeriods()
-      return payrollPeriods.value
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function getPayrollPeriod(id: string): Promise<PayrollPeriod | null> {
-    loading.value = true
-    error.value = null
-    try {
-      return await hrServiceAdapter.getPayrollPeriod(id)
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function createPayrollPeriod(input: PayrollPeriodInsert) {
-    loading.value = true
-    error.value = null
-    try {
-      const created = await hrServiceAdapter.createPayrollPeriod(input)
-      payrollPeriods.value.unshift(created)
-      return created
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function updatePayrollPeriod(id: string, updates: PayrollPeriodUpdate) {
-    loading.value = true
-    error.value = null
-    const index = payrollPeriods.value.findIndex((p) => p.id === id)
-    const old = index !== -1 ? { ...payrollPeriods.value[index] } : null
-    try {
-      const updated = await hrServiceAdapter.updatePayrollPeriod(id, updates)
-      if (index !== -1) payrollPeriods.value[index] = updated
-      return updated
-    } catch (e: any) {
-      if (old && index !== -1) payrollPeriods.value[index] = old
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function deletePayrollPeriod(id: string) {
-    loading.value = true
-    error.value = null
-    try {
-      await hrServiceAdapter.deletePayrollPeriod(id)
-      payrollPeriods.value = payrollPeriods.value.filter((p) => p.id !== id)
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function fetchPayrolls(periodId: string) {
-    loading.value = true
-    error.value = null
-    try {
-      payrolls.value = await hrServiceAdapter.fetchPayrolls(periodId)
+      payrolls.value = await hrServiceAdapter.fetchPayrolls(employeeId)
       return payrolls.value
     } catch (e: any) {
       error.value = e.message
@@ -394,18 +314,13 @@ export const useHrStore = defineStore('hr', () => {
     }
   }
 
-  async function generatePayroll(periodId: string) {
+  async function createPayroll(input: PayrollInsert) {
     loading.value = true
     error.value = null
     try {
-      await hrServiceAdapter.generatePayroll(periodId)
-      // RPC generate_payroll mengembalikan baris mentah tanpa join
-      // (tanpa nama karyawan & rincian item). Ambil ulang lewat
-      // fetchPayrolls agar slip langsung tampil lengkap.
-      payrolls.value = await hrServiceAdapter.fetchPayrolls(periodId)
-      // Refresh summary periode
-      await fetchPayrollPeriods()
-      return payrolls.value
+      const created = await hrServiceAdapter.createPayroll(input)
+      payrolls.value.unshift(created)
+      return created
     } catch (e: any) {
       error.value = e.message
       throw e
@@ -414,24 +329,18 @@ export const useHrStore = defineStore('hr', () => {
     }
   }
 
-  async function postPayrollJournal(periodId: string): Promise<string> {
+  async function updatePayroll(id: string, updates: PayrollUpdate) {
     loading.value = true
     error.value = null
+    const index = payrolls.value.findIndex((p) => p.id === id)
+    const old = index !== -1 ? { ...payrolls.value[index] } : null
     try {
-      const journalId = await hrServiceAdapter.postPayrollJournal(periodId)
-      // Update status lokal
-      const index = payrollPeriods.value.findIndex((p) => p.id === periodId)
-      if (index !== -1) {
-        payrollPeriods.value[index].status = 'paid'
-        payrollPeriods.value[index].paid_at = new Date().toISOString()
-      }
-      // Hanya slip milik periode ini yang berubah status — jangan sentuh slip periode lain
-      payrolls.value = payrolls.value.map((p) =>
-        p.period_id === periodId ? { ...p, status: 'paid' as const } : p
-      )
-      return journalId
+      const updated = await hrServiceAdapter.updatePayroll(id, updates)
+      if (index !== -1) payrolls.value[index] = updated
+      return updated
     } catch (e: any) {
       error.value = e.message
+      if (old && index !== -1) payrolls.value[index] = old
       throw e
     } finally {
       loading.value = false
@@ -440,6 +349,39 @@ export const useHrStore = defineStore('hr', () => {
 
   async function deletePayroll(id: string) {
     loading.value = true
+    error.value = null
+    try {
+      await hrServiceAdapter.deletePayroll(id)
+      payrolls.value = payrolls.value.filter((p) => p.id !== id)
+    } catch (e: any) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function postPayrollJournal(payrollId: string) {
+    loading.value = true
+    error.value = null
+    try {
+      const journalId = await hrServiceAdapter.postPayrollJournal(payrollId)
+      // Update status payroll jadi paid
+      const index = payrolls.value.findIndex((p) => p.id === payrollId)
+      if (index !== -1) {
+        payrolls.value[index] = { ...payrolls.value[index], status: 'paid' }
+      }
+      return journalId
+    } catch (e: any) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+
+  // ============================================================
+  // EMPLOYEE LOANS (KASBON)
+  // ============================================================
     error.value = null
     try {
       await hrServiceAdapter.deletePayroll(id)
@@ -563,37 +505,12 @@ export const useHrStore = defineStore('hr', () => {
     }
   }
 
-  /** Potong kasbon dari payroll periode yang sudah digenerate (RPC).
-   *  choices: { "<employee_id>": 'all' | 'half' | 'none' | "<nominal>" } */
-  async function applyKasbonDeductions(
-    periodId: string,
-    choices: Record<string, KasbonChoice>
-  ): Promise<KasbonDeductionResult> {
-    loading.value = true
-    error.value = null
-    try {
-      const result = await hrServiceAdapter.applyKasbonDeductions(periodId, choices)
-      // Slip berubah (deduction & net) + sisa kasbon berubah → refresh keduanya
-      payrolls.value = await hrServiceAdapter.fetchPayrolls(periodId)
-      await fetchPayrollPeriods()
-      await fetchEmployeeLoans()
-      return result
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
   return {
     employees,
     employeesWithStats,
     attendance,
     payrollComponents,
-    payrollPeriods,
     payrolls,
-    payrollSummary,
     employeeLoans,
     loading,
     error,
@@ -612,23 +529,17 @@ export const useHrStore = defineStore('hr', () => {
     createPayrollComponent,
     updatePayrollComponent,
     deletePayrollComponent,
-    fetchPayrollPeriods,
-    getPayrollPeriod,
-    createPayrollPeriod,
-    updatePayrollPeriod,
-    deletePayrollPeriod,
     fetchPayrolls,
     getPayroll,
+    createPayroll,
+    updatePayroll,
     deletePayroll,
-    generatePayroll,
     postPayrollJournal,
-    fetchPayrollSummary,
     fetchEmployeeLoans,
     getEmployeeLoan,
     createEmployeeLoan,
     updateEmployeeLoan,
     deleteEmployeeLoan,
     createLoanPayment,
-    applyKasbonDeductions,
   }
 })

@@ -229,57 +229,8 @@ export const hrService = {
   },
 
   // ============================================================
-  // PAYROLL PERIODS & PAYROLLS
+  // PAYROLLS (Per-Karyawan dengan Periode Individual)
   // ============================================================
-
-  async fetchPayrollPeriods(): Promise<PayrollPeriod[]> {
-    const { data, error } = await supabase
-      .from('payroll_periods')
-      .select('*')
-      .order('period_year', { ascending: false })
-      .order('period_month', { ascending: false })
-    if (error) throw error
-    return (data || []) as PayrollPeriod[]
-  },
-
-  async getPayrollPeriod(id: string): Promise<PayrollPeriod | null> {
-    const { data, error } = await supabase
-      .from('payroll_periods')
-      .select('*')
-      .eq('id', id)
-      .single()
-    if (error) throw error
-    return data as PayrollPeriod
-  },
-
-  async createPayrollPeriod(input: PayrollPeriodInsert): Promise<PayrollPeriod> {
-    const { data, error } = await supabase
-      .from('payroll_periods')
-      .insert(input)
-      .select()
-      .single()
-    if (error) throw error
-    return data as PayrollPeriod
-  },
-
-  async updatePayrollPeriod(id: string, updates: PayrollPeriodUpdate): Promise<PayrollPeriod> {
-    const { data, error } = await supabase
-      .from('payroll_periods')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) throw error
-    return data as PayrollPeriod
-  },
-
-  async deletePayrollPeriod(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('payroll_periods')
-      .delete()
-      .eq('id', id)
-    if (error) throw error
-  },
 
   async deletePayroll(id: string): Promise<void> {
     const { error } = await supabase
@@ -289,13 +240,18 @@ export const hrService = {
     if (error) throw error
   },
 
-  /** Payroll (slip gaji) per periode */
-  async fetchPayrolls(periodId: string): Promise<Payroll[]> {
-    const { data, error } = await supabase
+  /** Payroll (slip gaji) semua karyawan atau per karyawan */
+  async fetchPayrolls(employeeId?: string): Promise<Payroll[]> {
+    let query = supabase
       .from('payrolls')
       .select('*, items:payroll_items(*), employee:employees(name, employee_code, position, bank_name, bank_account_number, bank_account_name)')
-      .eq('period_id', periodId)
-      .order('created_at')
+      .order('period_start', { ascending: false })
+
+    if (employeeId) {
+      query = query.eq('employee_id', employeeId)
+    }
+
+    const { data, error } = await query
     if (error) throw error
     return (data || []) as Payroll[]
   },
@@ -310,52 +266,34 @@ export const hrService = {
     return data as Payroll
   },
 
-  /** Generate payroll via RPC */
-  async generatePayroll(periodId: string): Promise<Payroll[]> {
-    const { data, error } = await supabase.rpc('generate_payroll', {
-      p_period_id: periodId,
-    })
+  async createPayroll(input: PayrollInsert): Promise<Payroll> {
+    const { data, error } = await supabase
+      .from('payrolls')
+      .insert(input)
+      .select('*, items:payroll_items(*), employee:employees(name, employee_code, position, bank_name, bank_account_number, bank_account_name)')
+      .single()
     if (error) throw error
-    return (data || []) as Payroll[]
+    return data as Payroll
+  },
+
+  async updatePayroll(id: string, updates: PayrollUpdate): Promise<Payroll> {
+    const { data, error } = await supabase
+      .from('payrolls')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*, items:payroll_items(*), employee:employees(name, employee_code, position, bank_name, bank_account_number, bank_account_name)')
+      .single()
+    if (error) throw error
+    return data as Payroll
   },
 
   /** Post payroll journal via RPC (auto-jurnal ke finance) */
-  async postPayrollJournal(periodId: string): Promise<string> {
+  async postPayrollJournal(payrollId: string): Promise<string> {
     const { data, error } = await supabase.rpc('post_payroll_journal', {
-      p_period_id: periodId,
+      p_payroll_id: payrollId,
     })
     if (error) throw error
     return data as string
-  },
-
-  /** Terapkan potongan kasbon ke payroll periode (RPC).
-   *  p_choices: { "<employee_id>": 'all' | 'half' | 'none' | "<nominal>" } */
-  async applyKasbonDeductions(periodId: string, choices: Record<string, KasbonChoice>): Promise<KasbonDeductionResult> {
-    const { data, error } = await supabase.rpc('apply_kasbon_deductions', {
-      p_period_id: periodId,
-      p_choices: choices,
-    })
-    if (error) throw error
-    return (data || { applied_count: 0, applied_amount: 0 }) as KasbonDeductionResult
-  },
-
-  /** Summary payroll untuk dashboard */
-  async getPayrollSummary(): Promise<PayrollSummary[]> {
-    const { data, error } = await supabase
-      .from('payroll_periods')
-      .select('id, period_code, total_employee, total_gross, total_deduction, total_net')
-      .order('period_year', { ascending: false })
-      .order('period_month', { ascending: false })
-      .limit(12)
-    if (error) throw error
-    return (data || []).map((r) => ({
-      period_id: r.id,
-      period_code: r.period_code,
-      employee_count: Number(r.total_employee) || 0,
-      total_gross: Number(r.total_gross) || 0,
-      total_deduction: Number(r.total_deduction) || 0,
-      total_net: Number(r.total_net) || 0,
-    }))
   },
 
   // ============================================================

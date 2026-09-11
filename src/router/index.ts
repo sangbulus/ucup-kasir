@@ -726,20 +726,8 @@ const router = createRouter({
     {
       path: '/hr/payroll',
       name: 'Payroll List',
-      component: () => import('../views/Hr/PayrollList.vue'),
-      meta: { title: 'Payroll' },
-    },
-    {
-      path: '/hr/payroll/:id',
-      name: 'Payroll Detail',
-      component: () => import('../views/Hr/PayrollDetail.vue'),
-      meta: { title: 'Detail Payroll' },
-    },
-    {
-      path: '/hr/payroll/period/new',
-      name: 'Payroll Period New',
-      component: () => import('../views/Hr/PayrollPeriodForm.vue'),
-      meta: { title: 'Buat Periode Payroll' },
+      component: () => import('../views/Hr/PayrollListNew.vue'),
+      meta: { title: 'Slip Gaji' },
     },
     {
       path: '/hr/payroll/components',
