@@ -586,27 +586,6 @@ export interface PayrollComponent {
 export type PayrollComponentInsert = Omit<PayrollComponent, 'id' | 'created_at' | 'updated_at'>
 export type PayrollComponentUpdate = Partial<PayrollComponentInsert>
 
-export interface PayrollPeriod {
-  id: string
-  user_id?: string
-  period_code: string
-  period_month: number
-  period_year: number
-  start_date: string
-  end_date: string
-  status: 'draft' | 'generated' | 'paid' | 'cancelled'
-  total_employee: number
-  total_gross: number
-  total_deduction: number
-  total_net: number
-  paid_at?: string
-  created_at: string
-  updated_at: string
-}
-
-export type PayrollPeriodInsert = Omit<PayrollPeriod, 'id' | 'created_at' | 'updated_at'>
-export type PayrollPeriodUpdate = Partial<PayrollPeriodInsert>
-
 export interface PayrollItem {
   id: string
   user_id?: string
@@ -621,8 +600,10 @@ export interface PayrollItem {
 export interface Payroll {
   id: string
   user_id?: string
-  period_id: string
   employee_id: string
+  period_start: string
+  period_end: string
+  period_code: string
   base_salary: number
   total_allowance: number
   total_deduction: number
@@ -638,15 +619,6 @@ export interface Payroll {
 
 export type PayrollInsert = Omit<Payroll, 'id' | 'created_at' | 'updated_at'>
 export type PayrollUpdate = Partial<PayrollInsert>
-
-export interface PayrollSummary {
-  period_id: string
-  period_code: string
-  employee_count: number
-  total_gross: number
-  total_deduction: number
-  total_net: number
-}
 
 // ============================================================
 // Kasbon Karyawan (Employee Loans)
