@@ -67,6 +67,7 @@
             <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ d.vehicle?.plate_number || '-' }}</td>
             <td class="px-4 py-3"><span class="rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase" :class="getStatusBadge(d.status)">{{ statusLabel(d.status) }}</span></td>
             <td class="px-4 py-3 text-right">
+              <button @click.stop="router.push(`/shipping/deliveries/print/${d.id}`)" class="mr-2 rounded-lg border border-blue-300 px-2.5 py-1 text-[9px] font-medium text-blue-600 hover:bg-blue-50 dark:border-blue-500/30 dark:text-blue-400 dark:hover:bg-blue-500/10">Cetak</button>
               <button @click.stop="router.push(`/shipping/deliveries/edit/${d.id}`)" class="mr-2 rounded-lg border border-gray-300 px-2.5 py-1 text-[9px] font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800">Edit</button>
               <button @click.stop="handleDelete(d.id)" class="rounded-lg border border-red-300 px-2.5 py-1 text-[9px] font-medium text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10">Hapus</button>
             </td>
@@ -92,6 +93,7 @@
           <p>📦 {{ d.items?.length || 0 }} item</p>
         </div>
         <div class="mt-2 flex justify-end gap-2 border-t border-gray-100 pt-2 dark:border-gray-800">
+          <button @click.stop="router.push(`/shipping/deliveries/print/${d.id}`)" class="rounded-lg border border-blue-300 px-2.5 py-1 text-[9px] font-medium text-blue-600 hover:bg-blue-50 dark:border-blue-500/30 dark:text-blue-400 dark:hover:bg-blue-500/10">Cetak</button>
           <button @click.stop="router.push(`/shipping/deliveries/edit/${d.id}`)" class="rounded-lg border border-gray-300 px-2.5 py-1 text-[9px] font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800">Edit</button>
           <button @click.stop="handleDelete(d.id)" class="rounded-lg border border-red-300 px-2.5 py-1 text-[9px] font-medium text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10">Hapus</button>
         </div>

@@ -730,10 +730,10 @@ const router = createRouter({
       meta: { title: 'Slip Gaji' },
     },
     {
-      path: '/hr/payroll/components',
-      name: 'Payroll Component List',
-      component: () => import('../views/Hr/PayrollComponentList.vue'),
-      meta: { title: 'Komponen Gaji' },
+      path: '/hr/payroll/print/:id',
+      name: 'Print Payroll Slip',
+      component: () => import('../views/Hr/PayrollSlipPrint.vue'),
+      meta: { title: 'Cetak Slip Gaji' },
     },
 
     // ============================================================
@@ -774,6 +774,12 @@ const router = createRouter({
       name: 'Edit Delivery Order',
       component: () => import('../views/Shipping/DeliveryOrderForm.vue'),
       meta: { title: 'Edit Surat Jalan' },
+    },
+    {
+      path: '/shipping/deliveries/print/:id',
+      name: 'Print Delivery Order',
+      component: () => import('../views/Shipping/DeliveryOrderPrint.vue'),
+      meta: { title: 'Cetak Surat Jalan' },
     },
     {
       path: '/shipping/vehicles',

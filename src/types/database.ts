@@ -565,59 +565,30 @@ export interface Attendance {
 export type AttendanceInsert = Omit<Attendance, 'id' | 'created_at' | 'updated_at'>
 export type AttendanceUpdate = Partial<AttendanceInsert>
 
-export interface PayrollComponent {
-  id: string
-  user_id?: string
-  name: string
-  type: 'tunjangan' | 'potongan'
-  amount: number
-  is_percentage: boolean
-  apply_to: 'semua' | 'per_jabatan' | 'per_karyawan'
-  /** 'supir' | 'loader' — berlaku bila apply_to = per_jabatan */
-  position?: PositionName | ''
-  employee_id?: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
-  /** Join opsional untuk tampilan (kolom "Berlaku") */
-  employee?: { name: string } | null
-}
-
-export type PayrollComponentInsert = Omit<PayrollComponent, 'id' | 'created_at' | 'updated_at'>
-export type PayrollComponentUpdate = Partial<PayrollComponentInsert>
-
-export interface PayrollItem {
-  id: string
-  user_id?: string
-  payroll_id: string
-  component_id?: string
-  component_name: string
-  component_type: 'tunjangan' | 'potongan'
-  amount: number
-  created_at: string
-}
+// Payroll Component & PayrollItem sudah dihapus dari sistem baru
+// Komponen otomatis tidak dipakai lagi, hanya potongan kasbon manual
 
 export interface Payroll {
   id: string
   user_id?: string
   employee_id: string
+  period_code: string
   period_start: string
   period_end: string
-  period_code: string
   base_salary: number
-  total_allowance: number
-  total_deduction: number
-  total_gross: number
+  incentive_amount: number
+  kasbon_deduction: number
   total_net: number
   status: 'draft' | 'paid'
+  journal_entry_id?: string
+  paid_at?: string
   notes?: string
   created_at: string
   updated_at: string
-  items?: PayrollItem[]
   employee?: Employee
 }
 
-export type PayrollInsert = Omit<Payroll, 'id' | 'created_at' | 'updated_at'>
+export type PayrollInsert = Omit<Payroll, 'id' | 'created_at' | 'updated_at' | 'employee'>
 export type PayrollUpdate = Partial<PayrollInsert>
 
 // ============================================================

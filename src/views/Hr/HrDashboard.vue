@@ -66,11 +66,11 @@
           <button @click="router.push('/hr/attendance')" class="rounded-xl border border-gray-200 p-3 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
             <span class="mb-1 block text-base">📅</span>Input Absensi
           </button>
-          <button @click="router.push('/hr/payroll/period/new')" class="rounded-xl border border-gray-200 p-3 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
-            <span class="mb-1 block text-base">💰</span>Buat Payroll
+          <button @click="router.push('/hr/payroll')" class="rounded-xl border border-gray-200 p-3 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+            <span class="mb-1 block text-base">💰</span>Slip Gaji
           </button>
-          <button @click="router.push('/hr/payroll/components')" class="rounded-xl border border-gray-200 p-3 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
-            <span class="mb-1 block text-base">⚙️</span>Komponen Gaji
+          <button @click="router.push('/hr/loans')" class="rounded-xl border border-gray-200 p-3 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+            <span class="mb-1 block text-base">📈</span>Kasbon Karyawan
           </button>
         </div>
       </div>
@@ -114,33 +114,35 @@
         </div>
       </div>
 
-      <!-- Periode Payroll Terakhir -->
+      <!-- Slip Gaji Terakhir -->
       <div class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div class="mb-3 flex items-center justify-between border-b border-gray-200 pb-2 dark:border-gray-700">
-          <h3 class="text-sm font-bold text-gray-900 dark:text-white">Periode Payroll</h3>
+          <h3 class="text-sm font-bold text-gray-900 dark:text-white">Slip Gaji Terakhir</h3>
           <button @click="router.push('/hr/payroll')" class="text-[10px] font-medium text-blue-600 hover:underline dark:text-blue-400">
             Kelola →
           </button>
         </div>
-        <div v-if="recentPeriods.length === 0" class="py-6 text-center">
-          <p class="text-sm text-gray-500 dark:text-gray-400">Belum ada periode payroll.</p>
-          <button @click="router.push('/hr/payroll/period/new')" class="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-500">
-            + Buat Periode
+        <div v-if="recentPayrolls.length === 0" class="py-6 text-center">
+          <p class="text-sm text-gray-500 dark:text-gray-400">Belum ada slip gaji.</p>
+          <button @click="router.push('/hr/payroll')" class="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-500">
+            + Buat Slip Gaji
           </button>
         </div>
         <div v-else class="space-y-2">
           <div
-            v-for="p in recentPeriods"
+            v-for="p in recentPayrolls"
             :key="p.id"
-            @click="router.push(`/hr/payroll/${p.id}`)"
+            @click="router.push(`/hr/payroll/print/${p.id}`)"
             class="flex cursor-pointer items-center gap-2.5 rounded-xl border border-gray-200 bg-gray-50 p-2.5 hover:border-blue-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-500/50"
           >
             <div class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-purple-500/10 text-[10px] font-bold text-purple-600 dark:text-purple-400">
-              {{ String(p.period_month).padStart(2, '0') }}
+              {{ getInitial(p.employee?.name || '?') }}
             </div>
             <div class="flex-1 min-w-0">
-              <p class="truncate text-xs font-medium text-gray-900 dark:text-white">{{ p.period_code }}</p>
-              <p class="text-[9px] text-gray-500 dark:text-gray-400">{{ p.total_employee }} karyawan</p>
+              <p class="truncate text-xs font-medium text-gray-900 dark:text-white">{{ p.employee?.name || '-' }}</p>
+              <p class="text-[9px] text-gray-500 dark:text-gray-400">
+                {{ p.period_code }} · {{ formatDateShort(p.period_start) }} - {{ formatDateShort(p.period_end) }}
+              </p>
             </div>
             <div class="text-right">
               <p class="text-xs font-bold text-gray-900 dark:text-white">{{ formatCurrency(p.total_net) }}</p>
@@ -189,8 +191,8 @@ const recentEmployees = computed(() =>
     .slice(0, 5)
 )
 
-const recentPeriods = computed(() => store.payrollPeriods.slice(0, 5))
-const latestPayroll = computed(() => store.payrollPeriods[0])
+const recentPayrolls = computed(() => store.payrolls.slice(0, 5))
+const latestPayroll = computed(() => store.payrolls[0])
 
 const getInitial = (name: string) => (name || '?').charAt(0).toUpperCase()
 
@@ -207,9 +209,7 @@ const getStatusBadge = (status: string) => {
 const getPayrollStatusLabel = (status: string) => {
   switch (status) {
     case 'draft': return 'Draft'
-    case 'generated': return 'Siap Bayar'
     case 'paid': return 'Dibayar'
-    case 'cancelled': return 'Batal'
     default: return status
   }
 }
@@ -217,11 +217,15 @@ const getPayrollStatusLabel = (status: string) => {
 const getPayrollStatusBadge = (status: string) => {
   switch (status) {
     case 'draft': return 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
-    case 'generated': return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
     case 'paid': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
-    case 'cancelled': return 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
     default: return 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
   }
+}
+
+const formatDateShort = (d: string) => {
+  if (!d) return '-'
+  const [y, m, day] = d.split('-')
+  return `${day}/${m}/${y.slice(2)}`
 }
 
 const formatCurrency = (value: number) =>
@@ -238,7 +242,7 @@ onMounted(async () => {
       new Date().toISOString().split('T')[0],
       new Date().toISOString().split('T')[0]
     ),
-    store.fetchPayrollPeriods(),
+    store.fetchPayrolls(),
   ])
 })
 </script>

@@ -88,11 +88,15 @@ export const shippingService = {
       .select(`
         *,
         vehicle:vehicles(*),
-        driver:employees(*)
+        driver:employees(*),
+        transaction_ids:delivery_order_transactions(transaction_id)
       `)
       .order('do_date', { ascending: false })
     if (error) throw error
-    return (data || []) as DeliveryOrder[]
+    return (data || []).map((d: any) => ({
+      ...d,
+      transaction_ids: (d.transaction_ids || []).map((t: any) => t.transaction_id),
+    })) as DeliveryOrder[]
   },
 
   async getDeliveryOrder(id: string): Promise<DeliveryOrder | null> {

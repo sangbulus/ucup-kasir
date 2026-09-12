@@ -418,6 +418,29 @@ const removeLoader = (i: number) => {
   loaders.value.splice(i, 1)
 }
 
+// Default form baru: sopir terisi pegawai berposisi 'supir' pertama,
+// tim muat terisi pegawai berposisi 'loader' pertama.
+const applyDefaultCrew = () => {
+  const active = (hr.employees || []).filter((e: any) => e.status === 'aktif')
+
+  if (!form.driver_id) {
+    const firstDriver = active.find((e: any) => e.position === 'supir')
+    if (firstDriver) form.driver_id = firstDriver.id
+  }
+
+  if (!form.vehicle_id) {
+    const firstVehicle = shipping.vehicles.find((v) => v.status === 'tersedia')
+    if (firstVehicle) form.vehicle_id = firstVehicle.id
+  }
+
+  if (loaders.value.length === 0) {
+    const firstLoader = active.find((e: any) => e.position === 'loader')
+    if (firstLoader) {
+      loaders.value.push({ employee_id: firstLoader.id, employee_name: firstLoader.name })
+    }
+  }
+}
+
 const handleSave = async (status: 'draft' | 'disiapkan') => {
   if (!form.driver_id) return toast.warning('Perhatian', 'Pilih sopir terlebih dahulu')
   if (!form.vehicle_id) return toast.warning('Perhatian', 'Pilih kendaraan terlebih dahulu')
@@ -479,6 +502,11 @@ onMounted(async () => {
       selectedTransactionIds.value = txIds
       loadItemsFromTransactions(txIds)
     }
+  }
+
+  // Form baru: auto-isi sopir & tim muat dari pegawai aktif
+  if (!isEdit.value) {
+    applyDefaultCrew()
   }
 
   if (isEdit.value && doId) {

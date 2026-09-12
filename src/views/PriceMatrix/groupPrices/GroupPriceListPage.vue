@@ -30,39 +30,56 @@
         <button type="button" class="ml-auto rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600" @click="addItem">+ Tambah Harga Grup</button>
       </div>
 
-      <div v-if="loading" class="space-y-3 md:hidden">
-        <div v-for="i in 3" :key="i" class="h-28 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800"></div>
+      <div v-if="loading" class="space-y-3">
+        <div v-for="i in 3" :key="i" class="h-20 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800"></div>
       </div>
-      <div v-else-if="filtered.length===0" class="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-900/50 md:hidden">
+      <div v-else-if="groups.length===0" class="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-900/50">
         <p class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ search || filterStatus ? 'Tidak ada yang cocok' : 'Belum ada harga grup' }}</p>
         <p class="mt-1 text-xs text-gray-500">Atur harga khusus untuk satu grup pelanggan.</p>
       </div>
-      <div v-else class="space-y-3 md:hidden">
-        <div v-for="row in pageItems" :key="row.id" class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div class="flex items-start justify-between gap-2">
-            <div class="min-w-0 flex-1">
-              <p class="truncate text-xs font-bold text-gray-900 dark:text-white">{{ row.product_name }}</p>
-              <p v-if="row.sku" class="text-[10px] text-gray-500">SKU: {{ row.sku }}</p>
-              <p class="mt-1 truncate text-[11px] font-medium text-violet-700 dark:text-violet-300">{{ row.group_name }}</p>
-            </div>
-            <button type="button" class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" @click="showMenu(row, $event)" aria-label="Menu">⋮</button>
-          </div>
-          <div class="mt-2 flex items-center justify-between">
-            <span class="text-[11px] text-gray-500">Min x{{ row.min_quantity }}</span>
-            <span class="text-sm font-bold text-gray-900 dark:text-white">{{ formatCurrency(row.custom_price) }}</span>
-          </div>
-          <div v-if="row.start_date || row.end_date" class="mt-1 text-[10px] text-gray-500">{{ formatRange(row.start_date, row.end_date) }}</div>
-          <div v-else class="mt-1 text-[10px] text-gray-500">Berlaku selamanya</div>
-          <p v-if="row.notes" class="mt-1 line-clamp-2 text-[11px] leading-snug text-gray-600 dark:text-gray-400">{{ row.notes }}</p>
-          <div class="mt-2 flex items-center gap-2">
-            <span :class="['inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium', row.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400']">
-              <span :class="['h-1.5 w-1.5 rounded-full', row.is_active ? 'bg-emerald-500' : 'bg-gray-400']"></span>{{ row.is_active ? 'Aktif' : 'Nonaktif' }}
+      <div v-else class="space-y-3">
+        <div v-for="g in pageGroups" :key="g.groupId" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <button type="button" class="flex w-full items-center gap-3 p-3.5 text-left md:p-4" @click="toggleGroup(g.groupId)">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-sm font-bold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">{{ initials(g.groupName) }}</span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm font-bold text-gray-900 dark:text-white">{{ g.groupName }}</span>
+              <span class="mt-0.5 block text-xs text-gray-500">
+                {{ g.items.length }} produk · {{ g.activeCount }} aktif
+              </span>
             </span>
+            <span class="hidden shrink-0 text-right text-[11px] text-gray-500 sm:block">
+              <span class="block font-semibold text-gray-900 dark:text-white">{{ priceRange(g) }}</span>
+            </span>
+            <svg :class="['h-4 w-4 shrink-0 text-gray-400 transition-transform', isExpanded(g.groupId) ? 'rotate-180' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+
+          <div v-if="isExpanded(g.groupId)" class="border-t border-gray-100 dark:border-gray-800">
+            <div v-for="row in g.items" :key="row.id" class="flex items-start gap-3 border-b border-gray-100 px-3.5 py-3 last:border-b-0 dark:border-gray-800/70 md:px-4">
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ row.product_name }}</p>
+                <p v-if="row.sku" class="text-[11px] text-gray-500">SKU: {{ row.sku }}</p>
+                <p class="mt-0.5 text-[11px] text-gray-500">
+                  Min x{{ row.min_quantity }} · {{ row.start_date || row.end_date ? formatRange(row.start_date, row.end_date) : 'Berlaku selamanya' }}
+                </p>
+                <span :class="['mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium', row.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400']">
+                  <span :class="['h-1.5 w-1.5 rounded-full', row.is_active ? 'bg-emerald-500' : 'bg-gray-400']"></span>{{ row.is_active ? 'Aktif' : 'Nonaktif' }}
+                </span>
+              </div>
+              <div class="flex shrink-0 flex-col items-end gap-1.5">
+                <span class="text-sm font-bold text-gray-900 dark:text-white">{{ formatCurrency(row.custom_price) }}</span>
+                <span class="flex items-center gap-1">
+                  <button type="button" class="hidden rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 md:inline-flex" @click="editItem(row)">Edit</button>
+                  <button type="button" class="hidden rounded-lg border border-red-200 px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 md:inline-flex" @click="askDelete(row)">Hapus</button>
+                  <button type="button" class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 md:hidden" @click="showMenu(row)" aria-label="Menu">⋮</button>
+                </span>
+              </div>
+            </div>
           </div>
-          <div class="mt-2 h-1 rounded-b-2xl bg-violet-500/60"></div>
+          <div class="h-1 rounded-b-2xl bg-violet-500/60"></div>
         </div>
-        <div v-if="filtered.length>pageSize" class="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-white/[0.03]">
-          <span class="text-xs text-gray-600 dark:text-gray-400">{{ (page-1)*pageSize+1 }}–{{ Math.min(page*pageSize, filtered.length) }} / {{ filtered.length }}</span>
+
+        <div v-if="groups.length>pageSize" class="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-white/[0.03]">
+          <span class="text-xs text-gray-600 dark:text-gray-400">{{ (page-1)*pageSize+1 }}–{{ Math.min(page*pageSize, groups.length) }} / {{ groups.length }} grup</span>
           <span class="flex items-center gap-2">
             <button type="button" :disabled="page===1" class="flex h-8 w-8 items-center justify-center rounded-lg border disabled:opacity-40" @click="page=Math.max(1,page-1)">‹</button>
             <span class="text-sm font-medium">{{ page }}/{{ totalPages }}</span>
@@ -70,40 +87,14 @@
           </span>
         </div>
       </div>
-
-      <div class="hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] md:block">
-        <div v-if="loading" class="p-8 text-center text-sm text-gray-500">Memuat…</div>
-        <div v-else-if="filtered.length===0" class="p-8 text-center text-sm text-gray-500">Belum ada harga grup.</div>
-        <div v-else class="overflow-x-auto">
-          <table class="w-full text-left text-sm">
-            <thead class="border-b bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-900/40">
-              <tr><th class="px-4 py-3">Grup</th><th class="px-4 py-3">Produk</th><th class="px-4 py-3">Min qty</th><th class="px-4 py-3 text-right">Harga</th><th class="px-4 py-3">Periode</th><th class="px-4 py-3">Status</th><th class="px-4 py-3"></th></tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-              <tr v-for="row in pageItems" :key="row.id" class="hover:bg-gray-50/60">
-                <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ row.group_name }}</td>
-                <td class="px-4 py-3">{{ row.product_name }}<span v-if="row.sku" class="ml-2 text-xs text-gray-500">{{ row.sku }}</span></td>
-                <td class="px-4 py-3 text-xs">{{ row.min_quantity }}</td>
-                <td class="px-4 py-3 text-right font-semibold">{{ formatCurrency(row.custom_price) }}</td>
-                <td class="px-4 py-3 text-xs text-gray-500">{{ formatRange(row.start_date, row.end_date) }}</td>
-                <td class="px-4 py-3"><span :class="['rounded-full px-2 py-0.5 text-xs', row.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600']">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
-                <td class="px-4 py-3 text-right"><button type="button" class="rounded-lg border px-3 py-1.5 text-xs hover:bg-gray-50 dark:border-gray-700" @click="editItem(row)">Edit</button> <button type="button" class="ml-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50" @click="askDelete(row)">Hapus</button></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div v-if="filtered.length>pageSize" class="flex items-center justify-between border-t px-4 py-3 text-xs dark:border-gray-800">
-          <span class="text-gray-600 dark:text-gray-400">{{ (page-1)*pageSize+1 }}–{{ Math.min(page*pageSize, filtered.length) }} / {{ filtered.length }}</span>
-          <span class="flex items-center gap-2"><button type="button" :disabled="page===1" class="rounded-lg border px-3 py-1 disabled:opacity-40" @click="page--">Prev</button><span>{{ page }}/{{ totalPages }}</span><button type="button" :disabled="page===totalPages" class="rounded-lg border px-3 py-1 disabled:opacity-40" @click="page++">Next</button></span>
-        </div>
-      </div>
     </div>
 
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="sheetOpen" class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 md:hidden" @click.self="sheetOpen=false">
+        <div v-if="sheetOpen" class="fixed inset-0 z-50 flex items-end justify-center bg-black/50" @click.self="sheetOpen=false">
           <div class="w-full max-w-lg rounded-t-3xl bg-white p-4 dark:bg-gray-900">
-            <p class="text-center text-sm font-bold text-gray-900 dark:text-white">{{ sheetRow?.group_name }} · {{ sheetRow?.product_name }}</p>
+            <p class="text-center text-sm font-bold text-gray-900 dark:text-white">{{ sheetRow?.product_name }}</p>
+            <p class="text-center text-xs text-gray-500">{{ sheetRow?.group_name }}</p>
             <div class="mt-4 grid gap-2">
               <button type="button" class="rounded-xl border bg-white px-4 py-3 text-left text-sm font-medium dark:border-gray-700 dark:bg-gray-800 dark:text-white" @click="editFromSheet">Edit</button>
               <button type="button" class="rounded-xl border px-4 py-3 text-left text-sm font-medium" :class="sheetRow?.is_active ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'" @click="toggleFromSheet">{{ sheetRow?.is_active ? 'Nonaktifkan' : 'Aktifkan' }}</button>
@@ -137,12 +128,11 @@ const loading = ref(false)
 const search = ref('')
 const filterStatus = ref<string | null>(null)
 const page = ref(1)
-const pageSize = 10
+const pageSize = 8
 type Row = { id: string; group_id: string; group_name: string; product_id: string; product_name: string; sku?: string; custom_price: number; min_quantity: number; is_active: boolean; start_date?: string; end_date?: string; notes?: string }
 const rows = ref<Row[]>([])
 const statusOptions = [{ label: 'Semua', value: null }, { label: 'Aktif', value: 'active' }, { label: 'Nonaktif', value: 'inactive' }]
-const paginationLabel = computed(()=> `${filtered.value.length} harga grup`)
-const totalPages = computed(()=> Math.max(1, Math.ceil(filtered.value.length/pageSize)))
+
 const filtered = computed(()=>{
   let r = rows.value
   const q = search.value.trim().toLowerCase()
@@ -151,8 +141,39 @@ const filtered = computed(()=>{
   else if (filterStatus.value==='inactive') r=r.filter(x=>!x.is_active)
   return r
 })
-const pageItems = computed(()=> filtered.value.slice((page.value-1)*pageSize, page.value*pageSize))
+
+type Group = { groupId: string; groupName: string; items: Row[]; activeCount: number }
+const groups = computed<Group[]>(()=>{
+  const map = new Map<string, Group>()
+  for (const row of filtered.value) {
+    const key = row.group_id || row.group_name
+    let g = map.get(key)
+    if (!g) { g = { groupId: key, groupName: row.group_name, items: [], activeCount: 0 }; map.set(key, g) }
+    g.items.push(row)
+    if (row.is_active) g.activeCount++
+  }
+  return [...map.values()].sort((a,b)=> a.groupName.localeCompare(b.groupName, 'id'))
+})
+
+const paginationLabel = computed(()=> `${groups.value.length} grup`)
+const totalPages = computed(()=> Math.max(1, Math.ceil(groups.value.length/pageSize)))
+const pageGroups = computed(()=> groups.value.slice((page.value-1)*pageSize, page.value*pageSize))
 watch([search, filterStatus], ()=> page.value=1)
+
+const expanded = ref<Set<string>>(new Set())
+const isExpanded = (id:string)=> !!search.value.trim() || expanded.value.has(id)
+const toggleGroup = (id:string)=>{
+  const s = new Set(expanded.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  expanded.value = s
+}
+
+const initials = (name:string)=> (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()
+const priceRange = (g:Group)=>{
+  const prices = g.items.map(i=>i.custom_price||0)
+  const min = Math.min(...prices), max = Math.max(...prices)
+  return min===max ? formatCurrency(min) : `${formatCurrency(min)} – ${formatCurrency(max)}`
+}
 
 const formatCurrency = (v:number)=> new Intl.NumberFormat('id-ID',{ style:'currency', currency:'IDR', maximumFractionDigits:0 }).format(v||0)
 const formatRange = (a?:string,b?:string)=> {
@@ -176,7 +197,7 @@ const addItem = ()=> router.push('/price-matrix/group-prices/add')
 const editItem = (r:Row)=> router.push(`/price-matrix/group-prices/${r.id}/edit`)
 const sheetOpen = ref(false)
 const sheetRow = ref<Row|null>(null)
-const showMenu = (r:Row,_e:Event)=>{ sheetRow.value=r; sheetOpen.value=true }
+const showMenu = (r:Row)=>{ sheetRow.value=r; sheetOpen.value=true }
 const editFromSheet = ()=>{ const r=sheetRow.value; sheetOpen.value=false; if(r) editItem(r) }
 const toggleFromSheet = async()=>{
   const r=sheetRow.value; if(!r) return; sheetOpen.value=false

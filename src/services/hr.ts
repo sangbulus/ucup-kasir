@@ -7,30 +7,20 @@ import type {
   Attendance,
   AttendanceInsert,
   AttendanceUpdate,
-  PayrollComponent,
-  PayrollComponentInsert,
-  PayrollComponentUpdate,
-  PayrollPeriod,
-  PayrollPeriodInsert,
-  PayrollPeriodUpdate,
   Payroll,
-  PayrollSummary,
   EmployeeLoan,
   EmployeeLoanInsert,
   EmployeeLoanUpdate,
   EmployeeLoanPayment,
   EmployeeLoanPaymentInsert,
-  KasbonChoice,
-  KasbonDeductionResult,
 } from '@/types/database'
 
 // ============================================================
-// Service: HR & Payroll (Supabase)
-// - Master: Karyawan (jabatan = teks 'supir' | 'loader', tanpa tabel)
+// Service: HR & Payroll (Supabase) - Sistem Baru
+// - Master: Karyawan (jabatan = teks 'supir' | 'loader')
 // - Absensi
-// - Komponen Payroll
-// - Kasbon (employee_loans) + potongan otomatis saat payroll
-// - Payroll Period & Slip Gaji (via RPC generate_payroll / apply_kasbon_deductions / post_payroll_journal)
+// - Payroll per-karyawan (via RPC generate_payroll_for_employee)
+// - Kasbon (employee_loans) dengan potongan manual di payroll
 // ============================================================
 
 export const hrService = {
@@ -86,7 +76,7 @@ export const hrService = {
     if (error) throw error
   },
 
-  /** Karyawan dengan statistik absensi */
+  /** Karyawan dengan statistik absensi bulan ini */
   async fetchEmployeesWithStats(): Promise<EmployeeWithStats[]> {
     const employees = await this.fetchEmployees()
     const currentMonth = new Date().toISOString().slice(0, 7)
@@ -171,81 +161,27 @@ export const hrService = {
     if (error) throw error
   },
 
-  /** Absensi bulk untuk satu karyawan (isian bulanan) */
   async bulkCreateAttendance(records: AttendanceInsert[]): Promise<number> {
-    let count = 0
-    for (const r of records) {
-      try {
-        await this.createAttendance(r)
-        count++
-      } catch {
-        // Skip duplicate
-      }
-    }
-    return count
-  },
-
-  // ============================================================
-  // PAYROLL COMPONENTS
-  // ============================================================
-
-  async fetchPayrollComponents(): Promise<PayrollComponent[]> {
-    const { data, error } = await supabase
-      .from('payroll_components')
-      .select('*, employee:employees(name)')
-      .order('type')
-      .order('name')
-    if (error) throw error
-    return (data || []) as PayrollComponent[]
-  },
-
-  async createPayrollComponent(input: PayrollComponentInsert): Promise<PayrollComponent> {
-    const { data, error } = await supabase
-      .from('payroll_components')
-      .insert(input)
-      .select()
-      .single()
-    if (error) throw error
-    return data as PayrollComponent
-  },
-
-  async updatePayrollComponent(id: string, updates: PayrollComponentUpdate): Promise<PayrollComponent> {
-    const { data, error } = await supabase
-      .from('payroll_components')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) throw error
-    return data as PayrollComponent
-  },
-
-  async deletePayrollComponent(id: string): Promise<void> {
     const { error } = await supabase
-      .from('payroll_components')
-      .delete()
-      .eq('id', id)
+      .from('attendance')
+      .insert(records)
     if (error) throw error
+    return records.length
   },
 
   // ============================================================
   // PAYROLLS (Per-Karyawan dengan Periode Individual)
+  // - Sistem baru: tidak ada payroll_periods & payroll_components
+  // - Generate per karyawan dengan range tanggal custom
+  // - Potongan kasbon manual input
   // ============================================================
-
-  async deletePayroll(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('payrolls')
-      .delete()
-      .eq('id', id)
-    if (error) throw error
-  },
 
   /** Payroll (slip gaji) semua karyawan atau per karyawan */
   async fetchPayrolls(employeeId?: string): Promise<Payroll[]> {
     let query = supabase
       .from('payrolls')
-      .select('*, items:payroll_items(*), employee:employees(name, employee_code, position, bank_name, bank_account_number, bank_account_name)')
-      .order('period_start', { ascending: false })
+      .select('*, employee:employees(name, employee_code, position)')
+      .order('created_at', { ascending: false })
 
     if (employeeId) {
       query = query.eq('employee_id', employeeId)
@@ -259,41 +195,60 @@ export const hrService = {
   async getPayroll(id: string): Promise<Payroll | null> {
     const { data, error } = await supabase
       .from('payrolls')
-      .select('*, items:payroll_items(*), employee:employees(name, employee_code, position, bank_name, bank_account_number, bank_account_name)')
+      .select('*, employee:employees(name, employee_code, position)')
       .eq('id', id)
       .single()
     if (error) throw error
     return data as Payroll
   },
 
-  async createPayroll(input: PayrollInsert): Promise<Payroll> {
-    const { data, error } = await supabase
-      .from('payrolls')
-      .insert(input)
-      .select('*, items:payroll_items(*), employee:employees(name, employee_code, position, bank_name, bank_account_number, bank_account_name)')
-      .single()
+  /**
+   * Generate payroll untuk 1 karyawan via RPC
+   * Backend akan auto-hitung base_salary, incentive dari surat jalan
+   */
+  async generatePayroll(
+    employeeId: string,
+    periodStart: string,
+    periodEnd: string,
+    kasbonDeduction: number = 0
+  ): Promise<Payroll> {
+    const { data, error } = await supabase.rpc('generate_payroll_for_employee', {
+      p_employee_id: employeeId,
+      p_period_start: periodStart,
+      p_period_end: periodEnd,
+      p_kasbon_deduction: kasbonDeduction,
+    })
     if (error) throw error
-    return data as Payroll
+    
+    // Fetch ulang untuk join employee
+    return this.getPayroll(data.id) as Promise<Payroll>
   },
 
-  async updatePayroll(id: string, updates: PayrollUpdate): Promise<Payroll> {
+  async updatePayroll(id: string, updates: Partial<Payroll>): Promise<Payroll> {
     const { data, error } = await supabase
       .from('payrolls')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .select('*, items:payroll_items(*), employee:employees(name, employee_code, position, bank_name, bank_account_number, bank_account_name)')
+      .select('*, employee:employees(name, employee_code, position)')
       .single()
     if (error) throw error
     return data as Payroll
   },
 
   /** Post payroll journal via RPC (auto-jurnal ke finance) */
-  async postPayrollJournal(payrollId: string): Promise<string> {
-    const { data, error } = await supabase.rpc('post_payroll_journal', {
+  async postPayrollJournal(payrollId: string): Promise<void> {
+    const { error } = await supabase.rpc('post_payroll_journal', {
       p_payroll_id: payrollId,
     })
     if (error) throw error
-    return data as string
+  },
+
+  /** Delete payroll via RPC (akan hapus jurnal juga jika ada) */
+  async deletePayroll(id: string): Promise<void> {
+    const { error } = await supabase.rpc('delete_payroll', {
+      p_payroll_id: id,
+    })
+    if (error) throw error
   },
 
   // ============================================================
@@ -303,8 +258,8 @@ export const hrService = {
   async fetchEmployeeLoans(): Promise<EmployeeLoan[]> {
     const { data, error } = await supabase
       .from('employee_loans')
-      .select('*, employee:employees(id, name, employee_code, position), payments:employee_loan_payments(*)')
-      .order('loan_date', { ascending: false })
+      .select('*, employee:employees(name, employee_code), payments:employee_loan_payments(*)')
+      .order('created_at', { ascending: false })
     if (error) throw error
     return (data || []) as EmployeeLoan[]
   },
@@ -312,7 +267,7 @@ export const hrService = {
   async getEmployeeLoan(id: string): Promise<EmployeeLoan | null> {
     const { data, error } = await supabase
       .from('employee_loans')
-      .select('*, employee:employees(id, name, employee_code, position), payments:employee_loan_payments(*)')
+      .select('*, employee:employees(name, employee_code), payments:employee_loan_payments(*)')
       .eq('id', id)
       .single()
     if (error) throw error
@@ -320,34 +275,21 @@ export const hrService = {
   },
 
   async createEmployeeLoan(input: EmployeeLoanInsert): Promise<EmployeeLoan> {
-    // remaining_amount selalu disamakan dengan amount saat awal (lunas dicicil via payment)
     const { data, error } = await supabase
       .from('employee_loans')
-      .insert({ ...input, remaining_amount: input.amount })
-      .select('*, employee:employees(id, name, employee_code, position)')
+      .insert(input)
+      .select('*, employee:employees(name, employee_code)')
       .single()
     if (error) throw error
     return data as EmployeeLoan
   },
 
   async updateEmployeeLoan(id: string, updates: EmployeeLoanUpdate): Promise<EmployeeLoan> {
-    const payload: Record<string, any> = { ...updates, updated_at: new Date().toISOString() }
-    // amount diubah → sisa ikut digeser agar selisih pembayaran tetap valid
-    if (updates.amount !== undefined && updates.remaining_amount === undefined) {
-      const existing = await this.getEmployeeLoan(id)
-      if (existing) {
-        const paid = Number(existing.amount) - Number(existing.remaining_amount)
-        payload.remaining_amount = Math.max(0, Number(updates.amount) - paid)
-        if (payload.status === undefined) {
-          payload.status = payload.remaining_amount <= 0 ? 'paid' : 'active'
-        }
-      }
-    }
     const { data, error } = await supabase
       .from('employee_loans')
-      .update(payload)
+      .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .select('*, employee:employees(id, name, employee_code, position)')
+      .select('*, employee:employees(name, employee_code)')
       .single()
     if (error) throw error
     return data as EmployeeLoan

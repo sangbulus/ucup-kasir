@@ -951,7 +951,44 @@ const resetItemPrice = (item: CartItem) => {
 }
 
 // Ganti customer → semua item non-override ikut harga customer baru
-watch(selectedCustomerId, () => repriceAllItems())
+watch(selectedCustomerId, (newId, oldId) => {
+  if (oldId && cartItems.length > 0) {
+    const overriddenCount = cartItems.filter(i => i.priceOverridden).length
+    repriceAllItems()
+    if (overriddenCount > 0) {
+      toast.info('Customer Diganti', `${overriddenCount} item tetap pakai harga manual override`)
+    } else if (cartItems.length > 0) {
+      toast.success('Harga Diperbarui', 'Harga item disesuaikan dengan customer baru')
+    }
+  } else {
+    repriceAllItems()
+  }
+})
+
+// P1 FIX: Warning jika diskon berlebihan (> 50% subtotal atau > subtotal)
+let discountWarningTimeout: ReturnType<typeof setTimeout> | null = null
+watch(discount, (newDiscount) => {
+  if (discountWarningTimeout) clearTimeout(discountWarningTimeout)
+  
+  if (newDiscount > 0 && subtotal.value > 0) {
+    const discountPercent = (newDiscount / subtotal.value) * 100
+    
+    // Debounce 800ms untuk tidak spam toast saat user mengetik
+    discountWarningTimeout = setTimeout(() => {
+      if (newDiscount > subtotal.value) {
+        toast.warning(
+          'Diskon Melebihi Subtotal', 
+          `Diskon Rp ${formatNumber(newDiscount)} > Subtotal Rp ${formatNumber(subtotal.value)}`
+        )
+      } else if (discountPercent > 50) {
+        toast.warning(
+          'Diskon Besar', 
+          `Diskon ${discountPercent.toFixed(0)}% dari subtotal. Pastikan sudah benar.`
+        )
+      }
+    }, 800)
+  }
+})
 
 const formatDate = (date: Date) =>
   date.toLocaleDateString('id-ID', {
@@ -1110,6 +1147,25 @@ const handleSubmit = async () => {
 
   if (cartItems.length === 0) {
     toast.error('Gagal!', 'Belum ada produk di keranjang')
+    return
+  }
+
+  // CRITICAL FIX: Validasi semua quantity sebelum submit
+  // Pastikan semua draft quantity ter-commit ke item.quantity
+  cartItems.forEach(item => validateQuantity(item))
+
+  // Cek apakah ada item dengan quantity invalid (0 atau negatif)
+  const invalidItems = cartItems.filter(item => !item.quantity || item.quantity <= 0)
+  if (invalidItems.length > 0) {
+    toast.error('Gagal!', 'Ada item dengan jumlah tidak valid. Pastikan semua quantity > 0')
+    return
+  }
+
+  // Cek apakah ada item dengan quantity melebihi stok
+  const overStockItems = cartItems.filter(item => item.quantity > item.stock)
+  if (overStockItems.length > 0) {
+    const itemNames = overStockItems.map(item => `${item.name} (stok: ${item.stock})`).join(', ')
+    toast.error('Gagal!', `Quantity melebihi stok untuk: ${itemNames}`)
     return
   }
 

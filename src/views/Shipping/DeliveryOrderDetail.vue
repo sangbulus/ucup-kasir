@@ -5,6 +5,9 @@
     <!-- Mobile Header -->
     <MobilePageHeader title="Detail Surat Jalan" :subtitle="order?.do_number || 'Loading...'" back-to="/shipping/deliveries">
       <template #actions>
+        <button @click="router.push(`/shipping/deliveries/print/${order?.id}`)" class="flex h-8 w-8 items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400" title="Cetak surat jalan">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zM7 5h10a2 2 0 002-2V1H5v2a2 2 0 002 2z" /></svg>
+        </button>
         <button @click="router.push(`/shipping/deliveries/edit/${order?.id}`)" class="flex h-8 w-8 items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
         </button>
@@ -80,23 +83,27 @@
         <div class="grid grid-cols-2 gap-3">
           <div>
             <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Pelanggan</p>
-            <p class="text-xs font-medium text-gray-900 dark:text-white">{{ order.customer_name || '-' }}</p>
+            <p class="text-xs font-medium text-gray-900 dark:text-white">{{ customerInfo?.name || order.customer_name || '-' }}</p>
           </div>
           <div>
             <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Sopir</p>
             <p class="text-xs font-medium text-gray-900 dark:text-white">{{ order.driver_name || '-' }}</p>
           </div>
+          <div v-if="customerInfo?.store_name">
+            <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Nama Toko</p>
+            <p class="text-xs font-medium text-gray-900 dark:text-white">{{ customerInfo.store_name }}</p>
+          </div>
+          <div v-if="customerInfo?.phone">
+            <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Telepon</p>
+            <p class="text-xs font-medium text-gray-900 dark:text-white">{{ customerInfo.phone }}</p>
+          </div>
           <div>
             <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Kendaraan</p>
             <p class="text-xs font-medium text-gray-900 dark:text-white">{{ order.vehicle?.plate_number || '-' }} <span class="text-gray-400">({{ order.vehicle?.vehicle_type || '' }})</span></p>
           </div>
-          <div>
-            <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Gaji Sopir</p>
-            <p class="text-xs font-medium text-gray-900 dark:text-white">{{ formatMoney(order.driver_fee || 0) }}</p>
-          </div>
-          <div>
-            <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Alamat</p>
-            <p class="text-xs font-medium text-gray-900 dark:text-white">{{ order.customer_address || '-' }}</p>
+          <div class="col-span-2">
+            <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Alamat Pengiriman</p>
+            <p class="text-xs font-medium text-gray-900 dark:text-white">{{ customerInfo?.address || order.customer_address || '-' }}</p>
           </div>
           <div v-if="order.notes" class="col-span-2">
             <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Catatan</p>
@@ -136,20 +143,18 @@
               <tr class="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-400 dark:border-gray-700">
                 <th class="py-2 pr-2 font-medium">Produk</th>
                 <th class="py-2 px-2 text-right font-medium">Jumlah</th>
-                <th class="py-2 px-2 text-right font-medium">Upah/Karung</th>
-                <th class="py-2 pl-2 text-right font-medium">Total Upah</th>
+                <th class="py-2 pl-2 text-right font-medium">Nilai Barang</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(li, i) in loadRows" :key="i" class="border-b border-gray-100 last:border-0 dark:border-gray-800">
                 <td class="py-2 pr-2 font-medium text-gray-900 dark:text-white">{{ li.product_name }}</td>
                 <td class="py-2 px-2 text-right text-gray-700 dark:text-gray-300">{{ li.quantity }}</td>
-                <td class="py-2 px-2 text-right text-gray-700 dark:text-gray-300">{{ formatMoney(li.unit_price) }}</td>
-                <td class="py-2 pl-2 text-right font-semibold text-gray-900 dark:text-white">{{ formatMoney(li.quantity * li.unit_price) }}</td>
+                <td class="py-2 pl-2 text-right font-semibold text-gray-900 dark:text-white">{{ formatMoney(li.item_value) }}</td>
               </tr>
               <tr>
-                <td colspan="3" class="pt-2.5 pr-2 text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400">Total nilai muatan</td>
-                <td class="pt-2.5 pl-2 text-right text-xs font-black text-gray-900 dark:text-white">{{ formatMoney(totalLoadValue) }}</td>
+                <td colspan="2" class="pt-2.5 pr-2 text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400">Total</td>
+                <td class="pt-2.5 pl-2 text-right text-xs font-black text-gray-900 dark:text-white">{{ formatMoney(totalItemValue) }}</td>
               </tr>
             </tbody>
           </table>
@@ -188,8 +193,11 @@
         </div>
       </div>
 
-      <!-- Desktop edit button -->
-      <div class="hidden md:flex justify-end">
+      <!-- Desktop action buttons -->
+      <div class="hidden md:flex justify-end gap-2">
+        <button @click="router.push(`/shipping/deliveries/print/${order.id}`)" class="rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+          Cetak Surat Jalan
+        </button>
         <button @click="router.push(`/shipping/deliveries/edit/${order.id}`)" class="rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
           Edit Surat Jalan
         </button>
@@ -215,15 +223,44 @@ import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DatePickerModal from '@/components/common/DatePickerModal.vue'
 import { useShippingStore } from '@/stores/shipping'
+import { useCustomersStore } from '@/stores/customers'
+import { useTransactionsStore } from '@/stores/transactions'
+import type { Customer } from '@/types/database'
 
 const { confirm } = useConfirm()
 const toast = useToast()
 const route = useRoute()
 const router = useRouter()
 const store = useShippingStore()
+const customersStore = useCustomersStore()
+const txStore = useTransactionsStore()
 
 const doId = route.params.id as string
 const order = computed(() => store.currentOrder)
+
+// Data pelanggan diambil dari referensi transaksi (transaksi pertama yang dirujuk)
+const customerInfo = computed(() => {
+  const firstTx = (order.value?.transactions || [])[0]
+  const customerId = firstTx?.customer_id || order.value?.customer_id
+  const master = customerId
+    ? (customersStore.customers || []).find((c: Customer) => c.id === customerId)
+    : null
+  if (master) return master as Customer
+  // Fallback: nama pelanggan yang tersimpan di transaksi
+  if (firstTx?.customer_name) {
+    return {
+      id: firstTx.customer_id || '',
+      name: firstTx.customer_name,
+      store_name: '',
+      phone: '',
+      address: '',
+      credit_limit: 0,
+      created_at: '',
+      updated_at: '',
+    } as Customer
+  }
+  return null
+})
 
 // ---- Ubah tanggal pengiriman langsung dari halaman detail (pakai DatePickerModal) ----
 const showDatePicker = ref(false)
@@ -259,15 +296,33 @@ const saveDate = async (value: string) => {
 
 const formatMoney = (n: number) => 'Rp ' + new Intl.NumberFormat('id-ID').format(n || 0)
 
-// Satu daftar barang: utamakan load_items (punya harga); fallback items lama
+// Satu daftar barang: utamakan load_items; fallback items lama.
+// Nilai barang per produk diambil dari referensi transaksi (harga jual × jumlah dimuat).
 const loadRows = computed(() => {
   const li = order.value?.load_items || []
-  if (li.length > 0) return li.map((r) => ({ product_name: r.product_name, quantity: r.quantity, unit_price: r.unit_price }))
-  return (order.value?.items || []).map((r) => ({ product_name: r.product_name, quantity: r.quantity, unit_price: 0 }))
+  const source = li.length > 0
+    ? li.map((r) => ({ product_name: r.product_name, quantity: r.quantity }))
+    : (order.value?.items || []).map((r) => ({ product_name: r.product_name, quantity: r.quantity }))
+
+  // Kumpulkan harga satuan per produk dari transaksi yang dirujuk
+  const priceByName = new Map<string, number>()
+  const refTxIds = new Set(order.value?.transaction_ids || [])
+  for (const t of txStore.transactions || []) {
+    if (!refTxIds.has(t.id)) continue
+    for (const it of t.items || []) {
+      const name = (it.product_name || '').trim().toLowerCase()
+      if (name && !priceByName.has(name)) priceByName.set(name, it.price || 0)
+    }
+  }
+
+  return source.map((row) => {
+    const unitSellPrice = priceByName.get(row.product_name.trim().toLowerCase()) || 0
+    return { ...row, item_value: unitSellPrice * (row.quantity || 0) }
+  })
 })
 
-const totalLoadValue = computed(() =>
-  loadRows.value.reduce((sum, li) => sum + (li.quantity || 0) * (li.unit_price || 0), 0)
+const totalItemValue = computed(() =>
+  loadRows.value.reduce((sum, r) => sum + (r.item_value || 0), 0)
 )
 
 const getStatusBadge = (status: string) => {
@@ -334,6 +389,10 @@ const handleDelete = async () => {
 }
 
 onMounted(async () => {
-  await store.getDeliveryOrder(doId)
+  await Promise.all([
+    store.getDeliveryOrder(doId),
+    customersStore.fetchCustomers(),
+    txStore.fetchTransactions(),
+  ])
 })
 </script>

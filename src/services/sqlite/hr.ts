@@ -8,32 +8,23 @@ import type {
   Attendance,
   AttendanceInsert,
   AttendanceUpdate,
-  PayrollComponent,
-  PayrollComponentInsert,
-  PayrollComponentUpdate,
-  PayrollPeriod,
-  PayrollPeriodInsert,
-  PayrollPeriodUpdate,
   Payroll,
-  PayrollItem,
-  PayrollSummary,
   EmployeeLoan,
   EmployeeLoanInsert,
   EmployeeLoanUpdate,
   EmployeeLoanPayment,
   EmployeeLoanPaymentInsert,
-  KasbonChoice,
-  KasbonDeductionResult,
 } from '@/types/database'
 
 // ============================================================
 // SQLite Service: HR & Payroll
-// Mirror dari src/services/hr.ts — tanpa master Departemen/Jabatan
-// (jabatan kini teks tetap 'supir' | 'loader').
-// Semua fungsi replikasi dari Supabase + RPC:
-//   - generate_payroll (JS mirror)
-//   - apply_kasbon_deductions (JS mirror)
-//   - post_payroll_journal (JS mirror)
+// Mirror dari src/services/hr.ts — sistem payroll per-karyawan
+// (slip gaji mandiri per karyawan, periode custom, insentif
+// bongkar muat otomatis dari surat jalan, potongan kasbon manual).
+// Fungsi replikasi dari Supabase + RPC:
+//   - generate_payroll_for_employee (JS mirror)
+//   - post_payroll_journal (JS mirror, per slip)
+//   - delete_payroll (JS mirror, ikut hapus jurnal)
 // ============================================================
 
 export const sqliteHrService = {
@@ -287,569 +278,251 @@ export const sqliteHrService = {
   },
 
   // ============================================================
-  // PAYROLL COMPONENTS
+  // PAYROLL (Slip Gaji per karyawan — sistem baru)
+  // Mirror RPC Supabase: generate_payroll_for_employee,
+  // post_payroll_journal, delete_payroll.
+  // Tidak ada payroll_periods/payroll_components/payroll_items lagi.
   // ============================================================
 
-  async fetchPayrollComponents(): Promise<PayrollComponent[]> {
+  /** generate_payroll_code(): 'PAY-YYYYMM-NNNN' (urutan per bulan berjalan). */
+  async generatePayrollCode(): Promise<string> {
     const userId = getCurrentUserId()
-    const rows = await query<any>(
-      `SELECT pc.*, e.name AS employee_name
-       FROM payroll_components pc
-       LEFT JOIN employees e ON e.id = pc.employee_id
-       WHERE pc.user_id = ? ORDER BY pc.type, pc.name`,
-      [userId]
+    const now = new Date()
+    const ym = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+    const row = await queryOne<any>(
+      `SELECT COUNT(*) as count FROM payrolls
+       WHERE user_id = ? AND substr(created_at, 1, 7) = ?`,
+      [userId, `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`]
     )
-    return rows.map((r) => ({
-      ...this.mapPayrollComponent(r),
-      employee: r.employee_name ? { name: r.employee_name } : null,
-    }))
+    return `PAY-${ym}-${String((row?.count || 0) + 1).padStart(4, '0')}`
   },
 
-  async createPayrollComponent(input: PayrollComponentInsert): Promise<PayrollComponent> {
+  async fetchPayrolls(employeeId?: string): Promise<Payroll[]> {
     const userId = getCurrentUserId()
-    const id = uuid()
-    const now = nowIso()
-
-    await run(
-      `INSERT INTO payroll_components (id, user_id, name, type, amount, is_percentage, apply_to, position, employee_id, is_active, created_at, updated_at, sync_status, updated_at_local)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
-      [id, userId, input.name, input.type, input.amount || 0,
-       input.is_percentage ? 1 : 0, input.apply_to || 'semua',
-       input.position || null, input.employee_id || null,
-       input.is_active !== false ? 1 : 0, now, now, now]
-    )
-
-    const comp = await this.getPayrollComponent(id)
-    await addToSyncQueue('INSERT', 'payroll_components', id, comp || { id })
-    return comp!
+    let sql = `SELECT p.*, e.name as employee_name, e.employee_code, e.position
+               FROM payrolls p
+               LEFT JOIN employees e ON e.id = p.employee_id
+               WHERE p.user_id = ?`
+    const params: any[] = [userId]
+    if (employeeId) {
+      sql += ` AND p.employee_id = ?`
+      params.push(employeeId)
+    }
+    sql += ` ORDER BY p.created_at DESC`
+    const rows = await query<any>(sql, params)
+    return rows.map(this.mapPayrollWithEmployee)
   },
 
-  async getPayrollComponent(id: string): Promise<PayrollComponent | null> {
+  async getPayroll(id: string): Promise<Payroll | null> {
     const userId = getCurrentUserId()
     const row = await queryOne<any>(
-      `SELECT * FROM payroll_components WHERE id = ? AND user_id = ?`,
+      `SELECT p.*, e.name as employee_name, e.employee_code, e.position
+       FROM payrolls p
+       LEFT JOIN employees e ON e.id = p.employee_id
+       WHERE p.id = ? AND p.user_id = ?`,
       [id, userId]
     )
-    return row ? this.mapPayrollComponent(row) : null
+    return row ? this.mapPayrollWithEmployee(row) : null
   },
 
-  async updatePayrollComponent(id: string, updates: PayrollComponentUpdate): Promise<PayrollComponent> {
+  /**
+   * Mirror RPC generate_payroll_for_employee (satu slip per karyawan).
+   * base_salary dari data karyawan; insentif bongkar muat dihitung dari
+   * surat jalan 'selesai' dalam periode (CEIL(nilai muatan ÷ jumlah loader));
+   * potongan kasbon diinput manual.
+   */
+  async generatePayroll(
+    employeeId: string,
+    periodStart: string,
+    periodEnd: string,
+    kasbonDeduction: number = 0
+  ): Promise<Payroll> {
     const userId = getCurrentUserId()
     const now = nowIso()
-    const fields: string[] = []
-    const values: any[] = []
 
-    const updatable = ['name', 'type', 'amount', 'is_percentage', 'apply_to', 'position', 'employee_id', 'is_active'] as const
-    for (const key of updatable) {
-      if ((updates as any)[key] !== undefined) {
-        const val = (updates as any)[key]
-        if (key === 'is_percentage' || key === 'is_active') {
-          fields.push(`${key} = ?`)
-          values.push(val ? 1 : 0)
-        } else {
-          fields.push(`${key} = ?`)
-          values.push(val)
-        }
+    const emp = await queryOne<any>(
+      `SELECT * FROM employees WHERE id = ? AND user_id = ?`,
+      [employeeId, userId]
+    )
+    if (!emp) throw new Error('Karyawan tidak ditemukan')
+    if (emp.status !== 'aktif' || !emp.is_active) throw new Error('Karyawan tidak aktif')
+    if (periodStart > periodEnd) throw new Error('Tanggal mulai tidak boleh lebih besar dari tanggal selesai')
+
+    const periodCode = await this.generatePayrollCode()
+    const payrollId = uuid()
+    const baseSalary = Number(emp.base_salary) || 0
+
+    // Insentif bongkar muat (hanya jika karyawan pernah jadi loader)
+    let incentive = 0
+    const isLoader = await queryOne<any>(
+      `SELECT 1 as x FROM delivery_loaders WHERE employee_id = ? AND user_id = ? LIMIT 1`,
+      [employeeId, userId]
+    )
+    if (isLoader) {
+      const doRows = await query<any>(
+        `SELECT dor.id,
+                COALESCE((SELECT SUM(li.quantity * li.unit_price) FROM delivery_load_items li WHERE li.delivery_order_id = dor.id), 0) as nilai_muatan,
+                (SELECT COUNT(*) FROM delivery_loaders l WHERE l.delivery_order_id = dor.id) as jumlah_loader
+         FROM delivery_orders dor
+         WHERE dor.user_id = ? AND dor.status = 'selesai'
+           AND dor.do_date >= ? AND dor.do_date <= ?
+           AND EXISTS (SELECT 1 FROM delivery_loaders l WHERE l.delivery_order_id = dor.id AND l.employee_id = ?)`,
+        [userId, periodStart, periodEnd, employeeId]
+      )
+      for (const dor of doRows) {
+        const nilai = Number(dor.nilai_muatan) || 0
+        const orang = Number(dor.jumlah_loader) || 0
+        if (orang > 0 && nilai > 0) incentive += Math.ceil(nilai / orang)
       }
     }
 
-    fields.push('updated_at = ?', 'sync_status = ?', 'updated_at_local = ?')
-    values.push(now, 'pending', now, id, userId)
+    const kasbon = Number(kasbonDeduction) || 0
+    const totalNet = baseSalary + incentive - kasbon
 
     await run(
-      `UPDATE payroll_components SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`,
-      values
+      `INSERT INTO payrolls (id, user_id, employee_id, period_code, period_start, period_end,
+        base_salary, incentive_amount, kasbon_deduction, total_net, status, created_at, updated_at, sync_status, updated_at_local)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, 'pending', ?)`,
+      [payrollId, userId, employeeId, periodCode, periodStart, periodEnd,
+       baseSalary, incentive, kasbon, totalNet, now, now, now]
     )
 
-    const comp = await this.getPayrollComponent(id)
-    await addToSyncQueue('UPDATE', 'payroll_components', id, comp || { id })
-    return comp!
+    const created = await this.getPayroll(payrollId)
+    await addToSyncQueue('INSERT', 'payrolls', payrollId, created || { id: payrollId })
+    return created!
   },
 
-  async deletePayrollComponent(id: string): Promise<void> {
-    const userId = getCurrentUserId()
-    await run(`DELETE FROM payroll_components WHERE id = ? AND user_id = ?`, [id, userId])
-    await addToSyncQueue('DELETE', 'payroll_components', id, { id })
-  },
-
-  // ============================================================
-  // PAYROLL PERIODS
-  // ============================================================
-
-  async fetchPayrollPeriods(): Promise<PayrollPeriod[]> {
-    const userId = getCurrentUserId()
-    const rows = await query<any>(
-      `SELECT * FROM payroll_periods WHERE user_id = ? ORDER BY period_year DESC, period_month DESC`,
-      [userId]
-    )
-    return rows.map(this.mapPayrollPeriod)
-  },
-
-  async getPayrollPeriod(id: string): Promise<PayrollPeriod | null> {
-    const userId = getCurrentUserId()
-    const row = await queryOne<any>(
-      `SELECT * FROM payroll_periods WHERE id = ? AND user_id = ?`,
-      [id, userId]
-    )
-    return row ? this.mapPayrollPeriod(row) : null
-  },
-
-  async createPayrollPeriod(input: PayrollPeriodInsert): Promise<PayrollPeriod> {
-    const userId = getCurrentUserId()
-    const id = uuid()
-    const now = nowIso()
-
-    await run(
-      `INSERT INTO payroll_periods (id, user_id, period_code, period_month, period_year, start_date, end_date, status, total_employee, total_gross, total_deduction, total_net, created_at, updated_at, sync_status, updated_at_local)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', 0, 0, 0, 0, ?, ?, 'pending', ?)`,
-      [id, userId, input.period_code, input.period_month, input.period_year,
-       input.start_date, input.end_date, now, now, now]
-    )
-
-    const period = await this.getPayrollPeriod(id)
-    await addToSyncQueue('INSERT', 'payroll_periods', id, period || { id })
-    return period!
-  },
-
-  async updatePayrollPeriod(id: string, updates: PayrollPeriodUpdate): Promise<PayrollPeriod> {
+  async updatePayroll(id: string, updates: Partial<Payroll>): Promise<Payroll> {
     const userId = getCurrentUserId()
     const now = nowIso()
     const fields: string[] = []
     const values: any[] = []
-
-    const updatable = ['period_code', 'period_month', 'period_year', 'start_date', 'end_date', 'status'] as const
+    const updatable = [
+      'employee_id', 'period_code', 'period_start', 'period_end',
+      'base_salary', 'incentive_amount', 'kasbon_deduction', 'total_net', 'status', 'notes',
+    ] as const
     for (const key of updatable) {
       if ((updates as any)[key] !== undefined) {
         fields.push(`${key} = ?`)
         values.push((updates as any)[key])
       }
     }
-
     fields.push('updated_at = ?', 'sync_status = ?', 'updated_at_local = ?')
     values.push(now, 'pending', now, id, userId)
-
-    await run(
-      `UPDATE payroll_periods SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`,
-      values
-    )
-
-    const period = await this.getPayrollPeriod(id)
-    await addToSyncQueue('UPDATE', 'payroll_periods', id, period || { id })
-    return period!
+    await run(`UPDATE payrolls SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`, values)
+    const updated = await this.getPayroll(id)
+    await addToSyncQueue('UPDATE', 'payrolls', id, updated || { id })
+    return updated!
   },
 
-  async deletePayrollPeriod(id: string): Promise<void> {
+  /**
+   * Mirror RPC post_payroll_journal (per slip). Debit: akun Beban Gaji,
+   * Kredit: akun Hutang Gaji. Akun dicari via tipe+nama (enum lokal:
+   * 'beban' / 'kewajiban'), bukan kode tetap.
+   */
+  async postPayrollJournal(payrollId: string): Promise<void> {
     const userId = getCurrentUserId()
-    const period = await this.getPayrollPeriod(id)
-    if (!period) throw new Error('Periode payroll tidak ditemukan')
+    const now = nowIso()
 
-    // Jika sudah paid, hapus jurnal terkait terlebih dahulu
-    if (period.status === 'paid') {
-      await run(
-        `DELETE FROM journal_lines WHERE journal_id IN (SELECT id FROM journal_entries WHERE reference_type = 'payroll' AND reference_id = ? AND user_id = ?)`,
-        [id, userId]
-      )
-      await run(
-        `DELETE FROM journal_entries WHERE reference_type = 'payroll' AND reference_id = ? AND user_id = ?`,
-        [id, userId]
-      )
-    }
-
-    // Hapus payroll items & payrolls
-    await run(`DELETE FROM payroll_items WHERE payroll_id IN (SELECT id FROM payrolls WHERE period_id = ? AND user_id = ?)`, [id, userId])
-    await run(`DELETE FROM payrolls WHERE period_id = ? AND user_id = ?`, [id, userId])
-    await run(`DELETE FROM payroll_periods WHERE id = ? AND user_id = ?`, [id, userId])
-    await addToSyncQueue('DELETE', 'payroll_periods', id, { id })
-  },
-
-  async deletePayroll(id: string): Promise<void> {
-    const userId = getCurrentUserId()
-    await run(`DELETE FROM payroll_items WHERE payroll_id = ? AND user_id = ?`, [id, userId])
-    await run(`DELETE FROM payrolls WHERE id = ? AND user_id = ?`, [id, userId])
-    await addToSyncQueue('DELETE', 'payrolls', id, { id })
-  },
-
-  // ============================================================
-  // PAYROLLS (Slip Gaji)
-  // ============================================================
-
-  async fetchPayrolls(periodId: string): Promise<Payroll[]> {
-    const userId = getCurrentUserId()
-    const rows = await query<any>(
-      `SELECT p.*, e.name as employee_name, e.employee_code, e.position,
-              e.bank_name, e.bank_account_number, e.bank_account_name
+    const payroll = await queryOne<any>(
+      `SELECT p.*, e.name as employee_name
        FROM payrolls p
-       LEFT JOIN employees e ON e.id = p.employee_id
-       WHERE p.period_id = ? AND p.user_id = ?
-       ORDER BY p.created_at`,
-      [periodId, userId]
-    )
-
-    const result: Payroll[] = []
-    for (const r of rows) {
-      const items = await query<any>(
-        `SELECT * FROM payroll_items WHERE payroll_id = ? AND user_id = ? ORDER BY created_at`,
-        [r.id, userId]
-      )
-      result.push({
-        ...this.mapPayroll(r),
-        items: items.map(this.mapPayrollItem),
-        employee: r.employee_name ? {
-          name: r.employee_name,
-          employee_code: r.employee_code,
-          position: r.position,
-          bank_name: r.bank_name,
-          bank_account_number: r.bank_account_number,
-          bank_account_name: r.bank_account_name,
-        } as any : undefined,
-      })
-    }
-
-    return result
-  },
-
-  async getPayroll(id: string): Promise<Payroll | null> {
-    const userId = getCurrentUserId()
-    const row = await queryOne<any>(
-      `SELECT p.*, e.name as employee_name, e.employee_code, e.position,
-              e.bank_name, e.bank_account_number, e.bank_account_name
-       FROM payrolls p
-       LEFT JOIN employees e ON e.id = p.employee_id
+       JOIN employees e ON e.id = p.employee_id
        WHERE p.id = ? AND p.user_id = ?`,
-      [id, userId]
+      [payrollId, userId]
     )
-    if (!row) return null
+    if (!payroll) throw new Error('Slip gaji tidak ditemukan')
+    if (payroll.status === 'paid') throw new Error('Slip gaji sudah dibayar')
+    const totalNet = Number(payroll.total_net) || 0
+    if (totalNet <= 0) throw new Error('Gaji bersih harus lebih dari 0')
 
-    const items = await query<any>(
-      `SELECT * FROM payroll_items WHERE payroll_id = ? AND user_id = ? ORDER BY created_at`,
-      [id, userId]
-    )
-
-    return {
-      ...this.mapPayroll(row),
-      items: items.map(this.mapPayrollItem),
-      employee: row.employee_name ? {
-        name: row.employee_name,
-        employee_code: row.employee_code,
-        position: row.position,
-        bank_name: row.bank_name,
-        bank_account_number: row.bank_account_number,
-        bank_account_name: row.bank_account_name,
-      } as any : undefined,
-    }
-  },
-
-  /**
-   * Generate payroll untuk semua karyawan aktif dalam periode tertentu.
-   * Replikasi dari fungsi RPC generate_payroll.
-   */
-  async generatePayroll(periodId: string): Promise<Payroll[]> {
-    const userId = getCurrentUserId()
-    const now = nowIso()
-
-    // Validasi period
-    const period = await this.getPayrollPeriod(periodId)
-    if (!period) throw new Error('Periode payroll tidak ditemukan')
-    if (period.status === 'paid') throw new Error('Periode payroll sudah dibayar, tidak bisa digenerate ulang')
-
-    // Hapus payroll lama untuk periode ini (regenerate)
-    await run(
-      `DELETE FROM payroll_items WHERE payroll_id IN (SELECT id FROM payrolls WHERE period_id = ? AND user_id = ?)`,
-      [periodId, userId]
-    )
-    await run(
-      `DELETE FROM payrolls WHERE period_id = ? AND user_id = ?`,
-      [periodId, userId]
-    )
-
-    // Ambil semua karyawan aktif
-    const employees = await query<any>(
-      `SELECT * FROM employees WHERE user_id = ? AND is_active = 1 AND status = 'aktif'`,
+    const expenseAccount = await queryOne<any>(
+      `SELECT id, code, name FROM chart_of_accounts
+       WHERE user_id = ? AND type = 'beban' AND is_active = 1
+         AND (LOWER(name) LIKE '%gaji%' OR LOWER(name) LIKE '%salary%')
+       ORDER BY created_at LIMIT 1`,
       [userId]
     )
+    if (!expenseAccount)
+      throw new Error('Akun biaya gaji tidak ditemukan. Buat dulu akun tipe Beban dengan nama mengandung "Gaji"')
 
-    // Ambil semua komponen payroll aktif
-    const components = await query<any>(
-      `SELECT * FROM payroll_components WHERE user_id = ? AND is_active = 1`,
+    const liabilityAccount = await queryOne<any>(
+      `SELECT id, code, name FROM chart_of_accounts
+       WHERE user_id = ? AND type = 'kewajiban' AND is_active = 1
+         AND LOWER(name) LIKE '%hutang%' AND LOWER(name) LIKE '%gaji%'
+       ORDER BY created_at LIMIT 1`,
       [userId]
     )
+    if (!liabilityAccount)
+      throw new Error('Akun hutang gaji tidak ditemukan. Buat dulu akun tipe Kewajiban dengan nama mengandung "Hutang Gaji"')
 
-    // Hitung absensi per karyawan
-    const attRows = await query<any>(
-      `SELECT employee_id, status FROM attendance
-       WHERE user_id = ? AND attendance_date >= ? AND attendance_date <= ?`,
-      [userId, period.start_date, period.end_date]
-    )
-    const attByEmp = new Map<string, string[]>()
-    for (const a of attRows) {
-      const list = attByEmp.get(a.employee_id) || []
-      list.push(a.status)
-      attByEmp.set(a.employee_id, list)
-    }
-
-    // ---- Prefetch insentif bongkar muat (sebelum loop karyawan, hindari N×query) ----
-    // Sumber: surat jalan status 'selesai' dalam periode.
-    // Nilai muatan = Σ(delivery_load_items.quantity × unit_price);
-    // upah per orang per DO = CEIL(nilai ÷ jumlah tim muat).
-    const doRows = await query<any>(
-      `SELECT dor.id,
-              COALESCE((SELECT SUM(li.quantity * li.unit_price) FROM delivery_load_items li WHERE li.delivery_order_id = dor.id), 0) as nilai,
-              (SELECT COUNT(*) FROM delivery_loaders l WHERE l.delivery_order_id = dor.id) as orang
-       FROM delivery_orders dor
-       WHERE dor.user_id = ? AND dor.status = 'selesai'
-         AND dor.do_date >= ? AND dor.do_date <= ?`,
-      [userId, period.start_date, period.end_date]
-    )
-
-    // Peta: employee → total insentif (digabung antar DO, CEIL per DO)
-    const loaderRows = await query<any>(
-      `SELECT l.delivery_order_id, l.employee_id
-       FROM delivery_loaders l
-       WHERE l.user_id = ? AND l.delivery_order_id IN (${doRows.length > 0 ? doRows.map(() => '?').join(',') : "''"})`,
-      doRows.length > 0 ? [userId, ...doRows.map((d: any) => d.id)] : [userId]
-    )
-    const doById = new Map<string, any>()
-    for (const d of doRows) doById.set(d.id, d)
-
-    const insentifByEmp = new Map<string, number>()
-    for (const l of loaderRows) {
-      const dor = doById.get(l.delivery_order_id)
-      if (!dor) continue
-      const nilai = Number(dor.nilai) || 0
-      const orang = Number(dor.orang) || 0
-      if (orang <= 0 || nilai <= 0) continue
-      const upah = Math.ceil(nilai / orang)
-      insentifByEmp.set(l.employee_id, (insentifByEmp.get(l.employee_id) || 0) + upah)
-    }
-
-    const createdPayrolls: Payroll[] = []
-
-    for (const emp of employees) {
-      const payrollId = uuid()
-      const grossSalary = emp.base_salary && emp.base_salary > 0 ? emp.base_salary : 0
-      let totalAllowance = 0
-      let totalDeduction = 0
-      const items: PayrollItem[] = []
-
-      // Insert baris payroll TERLEBIH DAHULU — payroll_items punya FK ke payrolls
-      // dan PRAGMA foreign_keys aktif, jadi item tidak boleh insert sebelum induknya.
-      await run(
-        `INSERT INTO payrolls (id, user_id, period_id, employee_id, base_salary, total_allowance, total_deduction, total_gross, total_net, status, created_at, updated_at, sync_status, updated_at_local)
-         VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, 'draft', ?, ?, 'pending', ?)`,
-        [payrollId, userId, periodId, emp.id, grossSalary, grossSalary, grossSalary, now, now, now]
-      )
-
-      // Hitung komponen
-      for (const comp of components) {
-        // Cek apakah komponen berlaku untuk karyawan ini
-        if (comp.apply_to === 'per_jabatan' && comp.position !== emp.position) continue
-        if (comp.apply_to === 'per_karyawan' && comp.employee_id !== emp.id) continue
-
-        const isPercentage = !!comp.is_percentage
-        const amount = isPercentage ? Math.round(grossSalary * comp.amount / 100 * 100) / 100 : comp.amount
-
-        if (amount <= 0) continue
-
-        const itemId = uuid()
-        await run(
-          `INSERT INTO payroll_items (id, user_id, payroll_id, component_id, component_name, component_type, amount, created_at, sync_status, updated_at_local)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
-          [itemId, userId, payrollId, comp.id, comp.name, comp.type, amount, now, now]
-        )
-
-        items.push({
-          id: itemId,
-          user_id: userId,
-          payroll_id: payrollId,
-          component_id: comp.id,
-          component_name: comp.name,
-          component_type: comp.type,
-          amount,
-          created_at: now,
-        })
-
-        if (comp.type === 'tunjangan') totalAllowance += amount
-        else totalDeduction += amount
-      }
-
-      // ---- Insentif bongkar muat (satu baris gabungan, tunjangan) ----
-      const insentif = insentifByEmp.get(emp.id) || 0
-      if (insentif > 0) {
-        const insentifItemId = uuid()
-        await run(
-          `INSERT INTO payroll_items (id, user_id, payroll_id, component_id, component_name, component_type, amount, created_at, sync_status, updated_at_local)
-           VALUES (?, ?, ?, NULL, 'Insentif Bongkar Muat', 'tunjangan', ?, ?, 'pending', ?)`,
-          [insentifItemId, userId, payrollId, insentif, now, now]
-        )
-        items.push({
-          id: insentifItemId,
-          user_id: userId,
-          payroll_id: payrollId,
-          component_id: undefined,
-          component_name: 'Insentif Bongkar Muat',
-          component_type: 'tunjangan',
-          amount: insentif,
-          created_at: now,
-        })
-        totalAllowance += insentif
-      }
-
-      const totalGross = grossSalary + totalAllowance
-      const totalNet = Math.max(0, totalGross - totalDeduction)
-
-      // Update total pada baris payroll yang sudah dibuat
-      await run(
-        `UPDATE payrolls SET total_allowance = ?, total_deduction = ?, total_gross = ?, total_net = ?, updated_at = ?, updated_at_local = ? WHERE id = ?`,
-        [totalAllowance, totalDeduction, totalGross, totalNet, now, now, payrollId]
-      )
-
-      createdPayrolls.push({
-        id: payrollId,
-        user_id: userId,
-        period_id: periodId,
-        employee_id: emp.id,
-        base_salary: grossSalary,
-        total_allowance: totalAllowance,
-        total_deduction: totalDeduction,
-        total_gross: totalGross,
-        total_net: totalNet,
-        status: 'draft',
-        created_at: now,
-        updated_at: now,
-        items,
-        employee: { name: emp.name, employee_code: emp.employee_code } as any,
-      })
-    }
-
-    // Update summary periode
-    const totalGross = createdPayrolls.reduce((s, p) => s + p.total_gross, 0)
-    const totalDeduction = createdPayrolls.reduce((s, p) => s + p.total_deduction, 0)
-    const totalNet = createdPayrolls.reduce((s, p) => s + p.total_net, 0)
-
-    await run(
-      `UPDATE payroll_periods SET status = 'generated', total_employee = ?, total_gross = ?, total_deduction = ?, total_net = ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
-       WHERE id = ? AND user_id = ?`,
-      [createdPayrolls.length, totalGross, totalDeduction, totalNet, now, now, periodId, userId]
-    )
-
-    await addToSyncQueue('UPDATE', 'payroll_periods', periodId, { id: periodId, status: 'generated' })
-    // Slip & item yang baru dibuat juga harus ikut tersinkron ke cloud,
-    // kalau tidak, generate payroll di HP tidak pernah muncul di web.
-    for (const p of createdPayrolls) {
-      await addToSyncQueue('INSERT', 'payrolls', p.id, p)
-      for (const item of p.items || []) {
-        await addToSyncQueue('INSERT', 'payroll_items', item.id, item)
-      }
-    }
-
-    return createdPayrolls
-  },
-
-  /**
-   * Post payroll journal ke finance (auto-jurnal).
-   * Replikasi dari fungsi RPC post_payroll_journal.
-   * Debit: Beban Gaji (5-5200), Kredit: Utang Usaha (2-2000)
-   */
-  async postPayrollJournal(periodId: string): Promise<string> {
-    const userId = getCurrentUserId()
-    const now = nowIso()
-
-    const period = await this.getPayrollPeriod(periodId)
-    if (!period) throw new Error('Periode payroll tidak ditemukan')
-    if (period.status !== 'generated') throw new Error('Periode payroll harus dalam status generated sebelum posting jurnal')
-
-    // Cari akun
-    const bebanGaji = await queryOne<any>(
-      `SELECT id, code, name FROM chart_of_accounts WHERE user_id = ? AND code = '5-5200' AND is_active = 1`,
-      [userId]
-    )
-    if (!bebanGaji) throw new Error('Akun Beban Gaji (5-5200) belum tersedia')
-
-    const utangGaji = await queryOne<any>(
-      `SELECT id, code, name FROM chart_of_accounts WHERE user_id = ? AND code = '2-2000' AND is_active = 1`,
-      [userId]
-    )
-
+    // Nomor jurnal: JV-YYYYMMDD-NNNN
+    const d = new Date()
+    const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+    const jc = await queryOne<any>(`SELECT COUNT(*) as count FROM journal_entries WHERE user_id = ?`, [userId])
+    const journalNumber = `JV-${ymd}-${String((jc?.count || 0) + 1).padStart(4, '0')}`
     const journalId = uuid()
-    const date = new Date().toISOString().split('T')[0].replace(/-/g, '')
-    const suffix = Math.random().toString(36).substring(2, 8).toUpperCase()
-    const journalNumber = `JRN-${date}-${suffix}`
 
-    // Buat jurnal dalam transaksi
     await transaction(async (tx) => {
       await tx.run(
         `INSERT INTO journal_entries (id, user_id, journal_number, entry_date, description, reference_type, reference_id, status, created_at, updated_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, ?, 'payroll', ?, 'posted', ?, ?, 'pending', ?)`,
-        [journalId, userId, journalNumber, now, `Beban Gaji ${period.period_code}`, periodId, now, now, now]
+        [journalId, userId, journalNumber, now.split('T')[0],
+         `Pembayaran gaji ${payroll.employee_name} periode ${payroll.period_start} s/d ${payroll.period_end}`,
+         payrollId, now, now, now]
       )
-
-      // Debit: Beban Gaji
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, bebanGaji.id, '5-5200', 'Beban Gaji', period.total_gross, now, now]
+        [uuid(), userId, journalId, expenseAccount.id, expenseAccount.code, expenseAccount.name, totalNet, now, now]
       )
-
-      // Kredit: Utang Gaji (jika ada akun)
-      if (utangGaji && period.total_net > 0) {
-        await tx.run(
-          `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
-           VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'pending', ?)`,
-          [uuid(), userId, journalId, utangGaji.id, '2-2000', 'Utang Usaha', period.total_net, now, now]
-        )
-      }
+      await tx.run(
+        `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'pending', ?)`,
+        [uuid(), userId, journalId, liabilityAccount.id, liabilityAccount.code, liabilityAccount.name, totalNet, now, now]
+      )
+      await tx.run(
+        `UPDATE payrolls SET status = 'paid', journal_entry_id = ?, paid_at = ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
+         WHERE id = ? AND user_id = ?`,
+        [journalId, now, now, now, payrollId, userId]
+      )
     })
 
-    // Update status periode & payroll
-    await run(
-      `UPDATE payroll_periods SET status = 'paid', paid_at = ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
-       WHERE id = ? AND user_id = ?`,
-      [now, now, now, periodId, userId]
+    // Queue slip (status paid) + jurnal (header+lines lewat embedded self-heal syncEngine)
+    const paid = await this.getPayroll(payrollId)
+    await addToSyncQueue(
+      'UPDATE',
+      'payrolls',
+      payrollId,
+      paid || { id: payrollId, status: 'paid', journal_entry_id: journalId, paid_at: now }
     )
-
-    await run(
-      `UPDATE payrolls SET status = 'paid', updated_at = ?, sync_status = 'pending', updated_at_local = ?
-       WHERE period_id = ? AND user_id = ?`,
-      [now, now, periodId, userId]
-    )
-
-    await addToSyncQueue('UPDATE', 'payroll_periods', periodId, { id: periodId, status: 'paid', paid_at: now })
-
-    // Queue jurnal payroll (header + lines via embedded self-heal syncEngine)
-    // dan status tiap payroll yang baru jadi 'paid'.
     const { sqliteFinanceService } = await import('./finance')
     const journal = await sqliteFinanceService.getJournal(journalId)
     if (journal) {
       await addToSyncQueue('INSERT', 'journal_entries', journalId, journal)
     }
-    const paidPayrolls = await query<any>(
-      `SELECT id FROM payrolls WHERE period_id = ? AND user_id = ?`,
-      [periodId, userId]
-    )
-    for (const pp of paidPayrolls) {
-      await addToSyncQueue('UPDATE', 'payrolls', pp.id, { id: pp.id, status: 'paid', updated_at: now })
-    }
-
-    return journalId
   },
 
-  /** Summary payroll untuk dashboard */
-  async getPayrollSummary(): Promise<PayrollSummary[]> {
+  /**
+   * Mirror RPC delete_payroll: hapus jurnal terkait (jika sudah diposting)
+   * lalu slip-nya.
+   */
+  async deletePayroll(id: string): Promise<void> {
     const userId = getCurrentUserId()
-    const rows = await query<any>(
-      `SELECT id, period_code, total_employee, total_gross, total_deduction, total_net
-       FROM payroll_periods WHERE user_id = ?
-       ORDER BY period_year DESC, period_month DESC LIMIT 12`,
-      [userId]
+    const payroll = await queryOne<any>(
+      `SELECT id, journal_entry_id FROM payrolls WHERE id = ? AND user_id = ?`,
+      [id, userId]
     )
-    return rows.map((r: any) => ({
-      period_id: r.id,
-      period_code: r.period_code,
-      employee_count: r.total_employee,
-      total_gross: r.total_gross,
-      total_deduction: r.total_deduction,
-      total_net: r.total_net,
-    }))
+    if (!payroll) throw new Error('Slip gaji tidak ditemukan')
+
+    if (payroll.journal_entry_id) {
+      await run(`DELETE FROM journal_lines WHERE journal_id = ? AND user_id = ?`, [payroll.journal_entry_id, userId])
+      await run(`DELETE FROM journal_entries WHERE id = ? AND user_id = ?`, [payroll.journal_entry_id, userId])
+      await addToSyncQueue('DELETE', 'journal_entries', payroll.journal_entry_id, { id: payroll.journal_entry_id })
+    }
+
+    await run(`DELETE FROM payrolls WHERE id = ? AND user_id = ?`, [id, userId])
+    await addToSyncQueue('DELETE', 'payrolls', id, { id })
   },
 
   // ============================================================
@@ -1026,163 +699,6 @@ export const sqliteHrService = {
     return this.mapEmployeeLoanPayment(payment!)
   },
 
-  /**
-   * Terapkan potongan kasbon ke payroll periode (JS mirror dari RPC).
-   * Choices: { "<employee_id>": 'all' | 'half' | 'none' | "<nominal>" }
-   */
-  async applyKasbonDeductions(periodId: string, choices: Record<string, KasbonChoice>): Promise<KasbonDeductionResult> {
-    const userId = getCurrentUserId()
-    const now = nowIso()
-
-    let appliedCount = 0
-    let appliedAmount = 0
-
-    // Ambil semua slip payroll periode ini
-    const payrolls = await query<any>(
-      `SELECT * FROM payrolls WHERE period_id = ? AND user_id = ? AND status = 'draft'`,
-      [periodId, userId]
-    )
-
-    for (const p of payrolls) {
-      const choice = choices[p.employee_id] || 'all'
-      if (choice === 'none') continue
-
-      // Ambil kasbon aktif karyawan ini, FIFO
-      const loans = await query<any>(
-        `SELECT * FROM employee_loans
-         WHERE employee_id = ? AND user_id = ? AND status = 'active' AND remaining_amount > 0
-         ORDER BY loan_date ASC`,
-        [p.employee_id, userId]
-      )
-
-      if (loans.length === 0) continue
-
-      const totalGross = Number(p.total_gross) || 0
-      const totalDeduction = Number(p.total_deduction) || 0
-      let remainingAllowed = totalGross - totalDeduction
-      if (remainingAllowed <= 0) continue
-
-      // Custom cap (total maksimal per karyawan)
-      let customCap: number | null = null
-      if (choice !== 'all' && choice !== 'half') {
-        const parsed = parseFloat(choice)
-        if (!isNaN(parsed) && parsed > 0) {
-          customCap = parsed
-        }
-      }
-
-      let totalPaidThisEmployee = 0
-
-      for (const loan of loans) {
-        if (remainingAllowed <= 0) break
-        if (customCap !== null && totalPaidThisEmployee >= customCap) break
-
-        const remaining = Number(loan.remaining_amount) || 0
-        if (remaining <= 0) continue
-
-        let toPay = 0
-        if (choice === 'all') {
-          toPay = Math.min(remaining, remainingAllowed)
-        } else if (choice === 'half') {
-          toPay = Math.min(Math.floor(remaining / 2), remainingAllowed)
-        } else if (customCap !== null) {
-          const capLeft = customCap - totalPaidThisEmployee
-          toPay = Math.min(remaining, remainingAllowed, capLeft)
-        }
-
-        if (toPay <= 0) continue
-
-        // Insert payment
-        const paymentId = uuid()
-        await run(
-          `INSERT INTO employee_loan_payments (id, user_id, loan_id, payroll_id, payment_date, amount, notes, created_at, sync_status, updated_at_local)
-           VALUES (?, ?, ?, ?, ?, ?, 'Potongan otomatis dari payroll', ?, 'pending', ?)`,
-          [paymentId, userId, loan.id, p.id, now.split('T')[0], toPay, now, now]
-        )
-
-        // Update remaining kasbon
-        await run(
-          `UPDATE employee_loans SET remaining_amount = remaining_amount - ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
-           WHERE id = ? AND user_id = ?`,
-          [toPay, now, now, loan.id, userId]
-        )
-        await run(
-          `UPDATE employee_loans SET status = 'paid' WHERE id = ? AND user_id = ? AND remaining_amount <= 0`,
-          [loan.id, userId]
-        )
-
-        // Insert payroll_item
-        const itemId = uuid()
-        await run(
-          `INSERT INTO payroll_items (id, user_id, payroll_id, component_id, component_name, component_type, amount, created_at, sync_status, updated_at_local)
-           VALUES (?, ?, ?, NULL, 'Potongan Kasbon', 'potongan', ?, ?, 'pending', ?)`,
-          [itemId, userId, p.id, toPay, now, now]
-        )
-
-        remainingAllowed -= toPay
-        totalPaidThisEmployee += toPay
-        appliedCount++
-        appliedAmount += toPay
-
-        // Payload lengkap — versi `{ id }` saja selalu ditolak server
-        // (kolom NOT NULL kosong) dan jadi poison item di queue.
-        await addToSyncQueue('INSERT', 'employee_loan_payments', paymentId, {
-          id: paymentId,
-          loan_id: loan.id,
-          payroll_id: p.id,
-          payment_date: now.split('T')[0],
-          amount: toPay,
-          notes: 'Potongan otomatis dari payroll',
-          created_at: now,
-        })
-        await addToSyncQueue('UPDATE', 'employee_loans', loan.id, {
-          id: loan.id,
-          remaining_amount: (Number(loan.remaining_amount) || 0) - toPay,
-          status: (Number(loan.remaining_amount) || 0) - toPay <= 0 ? 'paid' : loan.status,
-          updated_at: now,
-        })
-        await addToSyncQueue('INSERT', 'payroll_items', itemId, {
-          id: itemId,
-          payroll_id: p.id,
-          component_name: 'Potongan Kasbon',
-          component_type: 'potongan',
-          amount: toPay,
-          created_at: now,
-        })
-      }
-
-      // Update payroll total
-      if (totalPaidThisEmployee > 0) {
-        const newDeduction = totalDeduction + totalPaidThisEmployee
-        const newNet = totalGross - newDeduction
-        await run(
-          `UPDATE payrolls SET total_deduction = ?, total_net = ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
-           WHERE id = ? AND user_id = ?`,
-          [newDeduction, newNet, now, now, p.id, userId]
-        )
-        await addToSyncQueue('UPDATE', 'payrolls', p.id, { id: p.id })
-      }
-    }
-
-    // Update period recap
-    if (appliedCount > 0) {
-      const periodRows = await query<any>(
-        `SELECT SUM(total_deduction) as sum_deduction, SUM(total_net) as sum_net FROM payrolls WHERE period_id = ? AND user_id = ?`,
-        [periodId, userId]
-      )
-      const sumDeduction = Number(periodRows[0]?.sum_deduction) || 0
-      const sumNet = Number(periodRows[0]?.sum_net) || 0
-      await run(
-        `UPDATE payroll_periods SET total_deduction = ?, total_net = ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
-         WHERE id = ? AND user_id = ?`,
-        [sumDeduction, sumNet, now, now, periodId, userId]
-      )
-      await addToSyncQueue('UPDATE', 'payroll_periods', periodId, { id: periodId })
-    }
-
-    return { applied_count: appliedCount, applied_amount: appliedAmount }
-  },
-
   // ============================================================
   // Sync helpers
   // ============================================================
@@ -1222,20 +738,6 @@ export const sqliteHrService = {
     }
   },
 
-  async replaceAllPayrollComponents(records: PayrollComponent[]): Promise<void> {
-    const userId = getCurrentUserId()
-    await run('DELETE FROM payroll_components WHERE user_id = ?', [userId])
-    const now = nowIso()
-    for (const r of records) {
-      await run(
-        `INSERT OR REPLACE INTO payroll_components (id, user_id, name, type, amount, is_percentage, apply_to, position, employee_id, is_active, created_at, updated_at, sync_status, updated_at_local)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
-        [r.id, r.user_id || userId, r.name, r.type, r.amount, r.is_percentage ? 1 : 0, r.apply_to,
-         r.position || null, r.employee_id || null, r.is_active ? 1 : 0, r.created_at, r.updated_at, r.updated_at || now]
-      )
-    }
-  },
-
   async replaceAllEmployeeLoans(records: Array<EmployeeLoan & { payments?: EmployeeLoanPayment[] }>): Promise<void> {
     const userId = getCurrentUserId()
     await run('DELETE FROM employee_loan_payments WHERE loan_id IN (SELECT id FROM employee_loans WHERE user_id = ?)', [userId])
@@ -1259,41 +761,21 @@ export const sqliteHrService = {
     }
   },
 
-  async replaceAllPayrollPeriods(periods: PayrollPeriod[]): Promise<void> {
+  async replaceAllPayrolls(records: Payroll[]): Promise<void> {
     const userId = getCurrentUserId()
-    await run('DELETE FROM payroll_periods WHERE user_id = ?', [userId])
-    const now = nowIso()
-    for (const r of periods) {
-      await run(
-        `INSERT OR REPLACE INTO payroll_periods (id, user_id, period_code, period_month, period_year, start_date, end_date, status, total_employee, total_gross, total_deduction, total_net, paid_at, created_at, updated_at, sync_status, updated_at_local)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
-        [r.id, r.user_id || userId, r.period_code, r.period_month, r.period_year, r.start_date, r.end_date,
-         r.status, r.total_employee, r.total_gross, r.total_deduction, r.total_net, r.paid_at || null,
-         r.created_at, r.updated_at, r.updated_at || now]
-      )
-    }
-  },
-
-  async replaceAllPayrolls(records: Array<Payroll & { items?: PayrollItem[] }>): Promise<void> {
-    const userId = getCurrentUserId()
-    await run('DELETE FROM payroll_items WHERE payroll_id IN (SELECT id FROM payrolls WHERE user_id = ?)', [userId])
     await run('DELETE FROM payrolls WHERE user_id = ?', [userId])
     const now = nowIso()
     for (const r of records) {
       await run(
-        `INSERT OR REPLACE INTO payrolls (id, user_id, period_id, employee_id, base_salary, total_allowance, total_deduction, total_gross, total_net, status, notes, created_at, updated_at, sync_status, updated_at_local)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
-        [r.id, r.user_id || userId, r.period_id, r.employee_id, r.base_salary, r.total_allowance, r.total_deduction,
-         r.total_gross, r.total_net, r.status, r.notes || null, r.created_at, r.updated_at, r.updated_at || now]
+        `INSERT OR REPLACE INTO payrolls (id, user_id, employee_id, period_code, period_start, period_end,
+          base_salary, incentive_amount, kasbon_deduction, total_net, status, journal_entry_id, paid_at,
+          notes, created_at, updated_at, sync_status, updated_at_local)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
+        [r.id, r.user_id || userId, r.employee_id, r.period_code, r.period_start, r.period_end,
+         r.base_salary, r.incentive_amount, r.kasbon_deduction, r.total_net, r.status,
+         r.journal_entry_id || null, r.paid_at || null, r.notes || null,
+         r.created_at, r.updated_at, r.updated_at || now]
       )
-      for (const item of r.items || []) {
-        await run(
-          `INSERT OR REPLACE INTO payroll_items (id, user_id, payroll_id, component_id, component_name, component_type, amount, created_at, sync_status, updated_at_local)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?)`,
-          [item.id, item.user_id || userId, r.id, item.component_id || null, item.component_name, item.component_type,
-           item.amount, item.created_at, item.created_at || now]
-        )
-      }
     }
   },
 
@@ -1347,72 +829,38 @@ export const sqliteHrService = {
     }
   },
 
-  mapPayrollComponent(r: any): PayrollComponent {
-    return {
-      id: r.id,
-      user_id: r.user_id,
-      name: r.name,
-      type: r.type,
-      amount: r.amount,
-      is_percentage: !!r.is_percentage,
-      apply_to: r.apply_to,
-      position: r.position ?? undefined,
-      employee_id: r.employee_id ?? undefined,
-      is_active: !!r.is_active,
-      created_at: r.created_at,
-      updated_at: r.updated_at,
-    }
-  },
-
-  mapPayrollPeriod(r: any): PayrollPeriod {
-    return {
-      id: r.id,
-      user_id: r.user_id,
-      period_code: r.period_code,
-      period_month: r.period_month,
-      period_year: r.period_year,
-      start_date: r.start_date,
-      end_date: r.end_date,
-      status: r.status,
-      total_employee: r.total_employee,
-      total_gross: r.total_gross,
-      total_deduction: r.total_deduction,
-      total_net: r.total_net,
-      paid_at: r.paid_at ?? undefined,
-      created_at: r.created_at,
-      updated_at: r.updated_at,
-    }
-  },
-
   mapPayroll(r: any): Payroll {
     return {
       id: r.id,
       user_id: r.user_id,
-      period_id: r.period_id,
       employee_id: r.employee_id,
+      period_code: r.period_code,
+      period_start: r.period_start,
+      period_end: r.period_end,
       base_salary: r.base_salary,
-      total_allowance: r.total_allowance,
-      total_deduction: r.total_deduction,
-      total_gross: r.total_gross,
+      incentive_amount: r.incentive_amount,
+      kasbon_deduction: r.kasbon_deduction,
       total_net: r.total_net,
       status: r.status,
+      journal_entry_id: r.journal_entry_id ?? undefined,
+      paid_at: r.paid_at ?? undefined,
       notes: r.notes ?? undefined,
       created_at: r.created_at,
       updated_at: r.updated_at,
     }
   },
 
-  mapPayrollItem(r: any): PayrollItem {
-    return {
-      id: r.id,
-      user_id: r.user_id,
-      payroll_id: r.payroll_id,
-      component_id: r.component_id ?? undefined,
-      component_name: r.component_name,
-      component_type: r.component_type,
-      amount: r.amount,
-      created_at: r.created_at,
+  /** Baris hasil JOIN payrolls × employees (dipakai fetchPayrolls/getPayroll). */
+  mapPayrollWithEmployee(r: any): Payroll {
+    const payroll = this.mapPayroll(r)
+    if (r.employee_name) {
+      payroll.employee = {
+        name: r.employee_name,
+        employee_code: r.employee_code,
+        position: r.position ?? undefined,
+      } as any
     }
+    return payroll
   },
 
   mapEmployeeLoan(r: any): EmployeeLoan {

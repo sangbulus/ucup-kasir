@@ -669,88 +669,33 @@ CREATE TABLE IF NOT EXISTS attendance (
 CREATE INDEX IF NOT EXISTS idx_attendance_user_date ON attendance (user_id, attendance_date DESC);
 CREATE INDEX IF NOT EXISTS idx_attendance_employee ON attendance (employee_id);
 
--- 35) Komponen Payroll (Tunjangan / Potongan)
-CREATE TABLE IF NOT EXISTS payroll_components (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  name TEXT NOT NULL,
-  type TEXT NOT NULL DEFAULT 'tunjangan' CHECK (type IN ('tunjangan', 'potongan')),
-  amount REAL NOT NULL DEFAULT 0,
-  is_percentage INTEGER NOT NULL DEFAULT 0,
-  apply_to TEXT NOT NULL DEFAULT 'semua' CHECK (apply_to IN ('semua', 'per_jabatan', 'per_karyawan')),
-  position TEXT CHECK (position IN ('supir', 'loader')),
-  employee_id TEXT,
-  is_active INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  sync_status TEXT NOT NULL DEFAULT 'synced',
-  updated_at_local TEXT,
-  FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
-);
-CREATE INDEX IF NOT EXISTS idx_payroll_components_user ON payroll_components (user_id);
-
--- 36) Periode Payroll (header)
-CREATE TABLE IF NOT EXISTS payroll_periods (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  period_code TEXT NOT NULL,
-  period_month INTEGER NOT NULL,
-  period_year INTEGER NOT NULL,
-  start_date TEXT NOT NULL,
-  end_date TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'generated', 'paid', 'cancelled')),
-  total_employee INTEGER NOT NULL DEFAULT 0,
-  total_gross REAL NOT NULL DEFAULT 0,
-  total_deduction REAL NOT NULL DEFAULT 0,
-  total_net REAL NOT NULL DEFAULT 0,
-  paid_at TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  sync_status TEXT NOT NULL DEFAULT 'synced',
-  updated_at_local TEXT,
-  UNIQUE (user_id, period_code)
-);
-CREATE INDEX IF NOT EXISTS idx_payroll_periods_user_date ON payroll_periods (user_id, period_year DESC, period_month DESC);
-
--- 37) Payroll (slip gaji per karyawan)
+-- 35) Payroll (slip gaji per karyawan, periode mandiri per slip)
 CREATE TABLE IF NOT EXISTS payrolls (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
-  period_id TEXT NOT NULL,
   employee_id TEXT NOT NULL,
+  period_code TEXT NOT NULL,
+  period_start TEXT NOT NULL,
+  period_end TEXT NOT NULL,
   base_salary REAL NOT NULL DEFAULT 0,
-  total_allowance REAL NOT NULL DEFAULT 0,
-  total_deduction REAL NOT NULL DEFAULT 0,
-  total_gross REAL NOT NULL DEFAULT 0,
+  incentive_amount REAL NOT NULL DEFAULT 0,
+  kasbon_deduction REAL NOT NULL DEFAULT 0,
   total_net REAL NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'paid')),
+  journal_entry_id TEXT,
+  paid_at TEXT,
   notes TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   sync_status TEXT NOT NULL DEFAULT 'synced',
   updated_at_local TEXT,
-  FOREIGN KEY (period_id) REFERENCES payroll_periods(id) ON DELETE CASCADE,
+  UNIQUE (user_id, period_code),
   FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS idx_payrolls_period ON payrolls (period_id);
-CREATE INDEX IF NOT EXISTS idx_payrolls_employee ON payrolls (employee_id);
-
--- 38) Payroll Items (rincian tunjangan/potongan per slip)
-CREATE TABLE IF NOT EXISTS payroll_items (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  payroll_id TEXT NOT NULL,
-  component_id TEXT,
-  component_name TEXT NOT NULL,
-  component_type TEXT NOT NULL DEFAULT 'tunjangan' CHECK (component_type IN ('tunjangan', 'potongan')),
-  amount REAL NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  sync_status TEXT NOT NULL DEFAULT 'synced',
-  updated_at_local TEXT,
-  FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE CASCADE,
-  FOREIGN KEY (component_id) REFERENCES payroll_components(id) ON DELETE SET NULL
-);
-CREATE INDEX IF NOT EXISTS idx_payroll_items_payroll ON payroll_items (payroll_id);
+CREATE INDEX IF NOT EXISTS idx_payrolls_user_employee ON payrolls (user_id, employee_id);
+CREATE INDEX IF NOT EXISTS idx_payrolls_period_dates ON payrolls (period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_payrolls_status ON payrolls (status);
+CREATE INDEX IF NOT EXISTS idx_payrolls_journal ON payrolls (journal_entry_id);
 
 -- 38b) Kasbon Karyawan (Employee Loans)
 CREATE TABLE IF NOT EXISTS employee_loans (

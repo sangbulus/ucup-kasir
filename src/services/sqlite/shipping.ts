@@ -119,8 +119,19 @@ export const sqliteShippingService = {
        ORDER BY dor.do_date DESC, dor.created_at DESC`,
       [userId]
     )
+    // Kumpulkan transaction_ids untuk semua surat jalan sekali query
+    const links = await query<any>(
+      `SELECT delivery_order_id, transaction_id FROM delivery_order_transactions WHERE user_id = ?`,
+      [userId]
+    )
+    const idsByDo = new Map<string, string[]>()
+    for (const l of links) {
+      if (!idsByDo.has(l.delivery_order_id)) idsByDo.set(l.delivery_order_id, [])
+      idsByDo.get(l.delivery_order_id)!.push(l.transaction_id)
+    }
     return rows.map((r: any) => ({
       ...this.mapDeliveryOrder(r),
+      transaction_ids: idsByDo.get(r.id) || [],
       vehicle: r.plate_number ? { plate_number: r.plate_number, vehicle_type: r.vehicle_type } as any : undefined,
       driver: r.driver_name ? { name: r.driver_name } as any : undefined,
     }))
@@ -156,7 +167,7 @@ export const sqliteShippingService = {
     if (doOrder.transaction_ids && doOrder.transaction_ids.length > 0) {
       const placeholders = doOrder.transaction_ids.map(() => '?').join(',')
       const txRows = await query<any>(
-        `SELECT id, transaction_number, customer_name, total FROM transactions
+        `SELECT id, transaction_number, customer_id, customer_name, total FROM transactions
          WHERE user_id = ? AND id IN (${placeholders})`,
         [userId, ...doOrder.transaction_ids]
       )

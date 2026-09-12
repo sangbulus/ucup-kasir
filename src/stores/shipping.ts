@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { shippingServiceAdapter } from '@/services'
+import { shippingServiceAdapter, transactionsServiceAdapter } from '@/services'
 import type {
   Vehicle,
   VehicleInsert,
@@ -174,6 +174,22 @@ export const useShippingStore = defineStore('shipping', () => {
       const updated = await shippingServiceAdapter.updateDeliveryStatus(id, status, note)
       if (index !== -1) deliveryOrders.value[index] = updated
       if (currentOrder.value?.id === id) currentOrder.value = updated
+
+      // Kirim selesai → status pengiriman transaksi dirujuk ikut "selesai" (terkunci)
+      if (status === 'selesai') {
+        let txIds = updated?.transaction_ids
+        if (!txIds || txIds.length === 0) {
+          const fresh = await shippingServiceAdapter.getDeliveryOrder(id)
+          txIds = fresh?.transaction_ids || []
+        }
+        for (const txId of txIds) {
+          try {
+            await transactionsServiceAdapter.updateStatus(txId, 'selesai')
+          } catch {
+            /* satu gagal, lanjut transaksi lainnya */
+          }
+        }
+      }
       return updated
     } catch (e: any) {
       if (old && index !== -1) deliveryOrders.value[index] = old

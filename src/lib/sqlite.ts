@@ -176,6 +176,72 @@ async function migrateSchema(): Promise<void> {
     console.warn('SQLite migrate: gagal rebuild journal_entries:', (e as Error).message)
   }
 
+  // Migrasi: sistem payroll berubah dari periode global (payroll_periods +
+  // payroll_components + payroll_items + payrolls ber-period_id) menjadi slip
+  // gaji mandiri per karyawan (periode per slip, insentif otomatis, kasbon
+  // manual) mengikuti refactor Supabase 2026-09-12. DB lama dengan kolom
+  // payrolls.period_id dibangun ulang: tabel legacy dihapus, payrolls baru
+  // dibuat kosong — cloud adalah sumber kebenaran, data lokal datang kembali
+  // lewat sync replaceAll.
+  try {
+    const pr = await db.query('PRAGMA table_info(payrolls)')
+    const hasPeriodId = (pr.values || []).some((r: any) => String(r.name) === 'period_id')
+    if (hasPeriodId) {
+      await db.execute('PRAGMA foreign_keys = OFF', false)
+      try {
+        await db.execute('DROP TABLE IF EXISTS payroll_items', false)
+        await db.execute('DROP TABLE IF EXISTS payroll_periods', false)
+        await db.execute('DROP TABLE IF EXISTS payroll_components', false)
+        await db.execute('DROP TABLE IF EXISTS payrolls', false)
+        await db.execute(
+          `CREATE TABLE payrolls (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            employee_id TEXT NOT NULL,
+            period_code TEXT NOT NULL,
+            period_start TEXT NOT NULL,
+            period_end TEXT NOT NULL,
+            base_salary REAL NOT NULL DEFAULT 0,
+            incentive_amount REAL NOT NULL DEFAULT 0,
+            kasbon_deduction REAL NOT NULL DEFAULT 0,
+            total_net REAL NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'paid')),
+            journal_entry_id TEXT,
+            paid_at TEXT,
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            sync_status TEXT NOT NULL DEFAULT 'synced',
+            updated_at_local TEXT,
+            UNIQUE (user_id, period_code),
+            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+          )`,
+          false
+        )
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_payrolls_user_employee ON payrolls (user_id, employee_id)',
+          false
+        )
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_payrolls_period_dates ON payrolls (period_start, period_end)',
+          false
+        )
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_payrolls_status ON payrolls (status)',
+          false
+        )
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_payrolls_journal ON payrolls (journal_entry_id)',
+          false
+        )
+      } finally {
+        await db.execute('PRAGMA foreign_keys = ON', false)
+      }
+    }
+  } catch (e) {
+    console.warn('SQLite migrate: gagal rebuild skema payroll:', (e as Error).message)
+  }
+
   // Migrasi: database lama dibuat sebelum kolom limit kredit ada.
   // CREATE TABLE IF NOT EXISTS tidak menambah kolom ke tabel yang sudah ada,
   // dan SQLite tidak mendukung ADD COLUMN IF NOT EXISTS — cek dulu via
@@ -197,24 +263,22 @@ async function migrateSchema(): Promise<void> {
     await addColumnIfMissing('transactions', 'transaction_status', "TEXT NOT NULL DEFAULT 'disiapkan'")
     // Jabatan kini teks tetap ('supir' | 'loader') — tabel departments/positions dihapus
     await addColumnIfMissing('employees', 'position', 'TEXT')
-    await addColumnIfMissing('payroll_components', 'position', 'TEXT')
   } catch (e) {
     console.warn('SQLite migrate: gagal menambah kolom limit kredit:', (e as Error).message)
   }
 
-  // Migrasi: rebuild employees & payroll_components bila masih menyimpan
-  // department_id/position_id (master Departemen/Jabatan sudah dihapus;
-  // jabatan kini kolom teks `position`). Foreign keys dimatikan selama
-  // rebuild agar DROP TABLE lama tidak cascade menghapus data turunan —
-  // id employee tetap sama sehingga relasi FK hasil rebuild tetap valid.
+  // Migrasi: rebuild employees bila masih menyimpan department_id/position_id
+  // (master Departemen/Jabatan sudah dihapus; jabatan kini kolom teks
+  // `position`). Foreign keys dimatikan selama rebuild agar DROP TABLE lama
+  // tidak cascade menghapus data turunan — id employee tetap sama sehingga
+  // relasi FK hasil rebuild tetap valid.
   try {
     const hasColumn = async (table: string, column: string): Promise<boolean> => {
       const res = await db!.query(`PRAGMA table_info(${table})`)
       return (res.values || []).some((r: any) => String(r.name) === column)
     }
     const legacyEmp = await hasColumn('employees', 'department_id')
-    const legacyPc = await hasColumn('payroll_components', 'position_id')
-    if (legacyEmp || legacyPc) {
+    if (legacyEmp) {
       await db!.execute('PRAGMA foreign_keys = OFF', false)
       try {
         if (legacyEmp) {
@@ -270,55 +334,6 @@ async function migrateSchema(): Promise<void> {
           await db!.execute('ALTER TABLE employees__new RENAME TO employees', false)
           await db!.execute(
             'CREATE INDEX IF NOT EXISTS idx_employees_user_name ON employees (user_id, name)',
-            false
-          )
-        }
-        if (legacyPc) {
-          await db!.execute(
-            `CREATE TABLE payroll_components__new (
-              id TEXT PRIMARY KEY,
-              user_id TEXT NOT NULL,
-              name TEXT NOT NULL,
-              type TEXT NOT NULL DEFAULT 'tunjangan' CHECK (type IN ('tunjangan', 'potongan')),
-              amount REAL NOT NULL DEFAULT 0,
-              is_percentage INTEGER NOT NULL DEFAULT 0,
-              apply_to TEXT NOT NULL DEFAULT 'semua' CHECK (apply_to IN ('semua', 'per_jabatan', 'per_karyawan')),
-              position TEXT CHECK (position IN ('supir', 'loader')),
-              employee_id TEXT,
-              is_active INTEGER NOT NULL DEFAULT 1,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              sync_status TEXT NOT NULL DEFAULT 'synced',
-              updated_at_local TEXT,
-              FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
-            )`,
-            false
-          )
-          // position lama (sebelum rebuild) mungkin masih kosong → backfill dari positions
-          const pcHasPos = await hasColumn('payroll_components', 'position')
-          await db!.execute(
-            `INSERT INTO payroll_components__new
-             SELECT id, user_id, name, type, amount, is_percentage, apply_to,
-                    ${
-                      pcHasPos
-                        ? `COALESCE(NULLIF(position, ''),
-                                    CASE WHEN lower(COALESCE((SELECT p.name FROM positions p WHERE p.id = payroll_components.position_id), ''))
-                                         IN ('supir','loader')
-                                         THEN lower((SELECT p.name FROM positions p WHERE p.id = payroll_components.position_id))
-                                         ELSE NULL END)`
-                        : `CASE WHEN lower(COALESCE((SELECT p.name FROM positions p WHERE p.id = payroll_components.position_id), ''))
-                               IN ('supir','loader')
-                               THEN lower((SELECT p.name FROM positions p WHERE p.id = payroll_components.position_id))
-                               ELSE NULL END`
-                    },
-                    employee_id, is_active, created_at, updated_at, sync_status, updated_at_local
-             FROM payroll_components`,
-            false
-          )
-          await db!.execute('DROP TABLE payroll_components', false)
-          await db!.execute('ALTER TABLE payroll_components__new RENAME TO payroll_components', false)
-          await db!.execute(
-            'CREATE INDEX IF NOT EXISTS idx_payroll_components_user ON payroll_components (user_id)',
             false
           )
         }

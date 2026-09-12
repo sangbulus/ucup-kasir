@@ -33,7 +33,8 @@
     </div>
 
     <!-- Filter -->
-    <div class="mb-4">
+    <div class="mb-4 flex items-center gap-2 pl-3.5 md:pl-0">
+      <input type="checkbox" :checked="isAllSelected" @change="toggleAll" class="h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200" />
       <div class="relative flex-1">
         <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
         <input v-model="search" type="text" placeholder="Cari nomor transaksi / pelanggan..." class="w-full rounded-xl border border-gray-300 bg-white py-2.5 pl-9 pr-3 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500" />
@@ -71,7 +72,7 @@
         </thead>
         <tbody>
           <tr
-            v-for="t in filtered"
+            v-for="t in paginated"
             :key="t.id"
             @click="toggleTransaction(t.id)"
             class="cursor-pointer border-b border-gray-100 transition hover:bg-blue-50/50 dark:border-gray-800 dark:hover:bg-blue-500/5"
@@ -85,7 +86,7 @@
             <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ formatMoney(t.total || 0) }}</td>
             <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ t.items?.length || 0 }} item</td>
             <td class="px-4 py-3">
-              <span class="rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase" :class="getPaymentBadge(t.payment_status)">{{ t.payment_status }}</span>
+              <span class="rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase" :class="getPaymentBadge(t.payment_status)">{{ getPaymentLabel(t.payment_status) }}</span>
             </td>
           </tr>
         </tbody>
@@ -95,7 +96,7 @@
     <!-- Mobile Cards -->
     <div v-else class="grid grid-cols-1 gap-3 md:hidden">
       <div
-        v-for="t in filtered"
+        v-for="t in paginated"
         :key="t.id"
         @click="toggleTransaction(t.id)"
         :class="[
@@ -115,7 +116,7 @@
               </div>
             </div>
           </div>
-          <span class="rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase" :class="getPaymentBadge(t.payment_status)">{{ t.payment_status }}</span>
+          <span class="rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase" :class="getPaymentBadge(t.payment_status)">{{ getPaymentLabel(t.payment_status) }}</span>
         </div>
         <div class="mt-2 grid grid-cols-2 gap-1 text-[10px] text-gray-500 dark:text-gray-400">
           <p>📅 {{ formatDate(t.created_at) }}</p>
@@ -123,6 +124,33 @@
           <p class="col-span-2 font-semibold text-gray-900 dark:text-white">{{ formatMoney(t.total || 0) }}</p>
         </div>
       </div>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="!loading && totalPages > 1" class="mt-4 flex items-center justify-between rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+      <button
+        @click="currentPage--"
+        :disabled="currentPage === 1"
+        class="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:text-gray-300 dark:hover:bg-gray-800"
+      >
+        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        Prev
+      </button>
+      <span class="text-xs font-medium text-gray-600 dark:text-gray-400">
+        Hal {{ currentPage }} dari {{ totalPages }}
+      </span>
+      <button
+        @click="currentPage++"
+        :disabled="currentPage === totalPages"
+        class="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:text-gray-300 dark:hover:bg-gray-800"
+      >
+        Next
+        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
     </div>
 
     <!-- Floating Action Button (Mobile) -->
@@ -142,7 +170,7 @@
 
 <script setup lang="ts">
 import { useToast } from '@/composables/useToast'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
@@ -160,13 +188,15 @@ const search = ref('')
 const selectedTxIds = ref<string[]>([])
 const loading = ref(false)
 const shippedTransactionIds = ref<Set<string>>(new Set())
+const currentPage = ref(1)
+const perPage = 10
 
-// Transaksi yang sudah lunas/cicilan dan belum ada di surat jalan
+// Semua transaksi yang belum ada di surat jalan (termasuk yang belum lunas)
 const pendingTransactions = computed(() => {
   return (txStore.transactions || []).filter((t: Transaction) => {
-    const isPaid = ['lunas', 'cicilan'].includes(t.payment_status)
+    const notVoided = t.status !== 'void' && t.status !== 'batal'
     const notShipped = !shippedTransactionIds.value.has(t.id)
-    return isPaid && notShipped
+    return notVoided && notShipped
   })
 })
 
@@ -177,6 +207,18 @@ const filtered = computed(() => {
     (t.transaction_number || '').toLowerCase().includes(q) ||
     (t.customer_name || '').toLowerCase().includes(q)
   )
+})
+
+const totalPages = computed(() => Math.ceil(filtered.value.length / perPage))
+
+const paginated = computed(() => {
+  const start = (currentPage.value - 1) * perPage
+  return filtered.value.slice(start, start + perPage)
+})
+
+watch(search, () => { currentPage.value = 1 })
+watch(() => filtered.value.length, () => {
+  if (currentPage.value > totalPages.value) currentPage.value = Math.max(1, totalPages.value)
 })
 
 const isAllSelected = computed(() =>
@@ -194,8 +236,14 @@ const formatDate = (d: string) => {
 
 const getPaymentBadge = (status: string) => {
   if (status === 'lunas') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
-  if (status === 'cicilan') return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
-  return 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+  if (status === 'cicilan' || status === 'sebagian') return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
+  return 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400'
+}
+
+const getPaymentLabel = (status: string) => {
+  if (status === 'lunas') return 'Lunas'
+  if (status === 'cicilan' || status === 'sebagian') return 'Cicilan'
+  return 'Belum Lunas'
 }
 
 const toggleTransaction = (txId: string) => {

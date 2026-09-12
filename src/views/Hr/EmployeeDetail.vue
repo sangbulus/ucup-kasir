@@ -169,18 +169,20 @@
           <div
             v-for="p in employeePayrolls"
             :key="p.id"
-            @click="router.push(`/hr/payroll/${p.period_id}`)"
+            @click="router.push(`/hr/payroll/print/${p.id}`)"
             class="cursor-pointer rounded-xl border border-gray-200 bg-white p-3 hover:border-blue-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-500/50"
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-xs font-medium text-gray-900 dark:text-white">{{ periodCode(p.period_id) }}</p>
-                <p class="text-[10px] text-gray-500 dark:text-gray-400">Gross: {{ formatCurrency(p.total_gross) }}</p>
+                <p class="text-xs font-medium text-gray-900 dark:text-white">{{ p.period_code }}</p>
+                <p class="text-[10px] text-gray-500 dark:text-gray-400">
+                  {{ formatDate(p.period_start) }} - {{ formatDate(p.period_end) }} · Gaji: {{ formatCurrency(p.base_salary) }}
+                </p>
               </div>
               <div class="text-right">
                 <p class="text-xs font-bold text-gray-900 dark:text-white">{{ formatCurrency(p.total_net) }}</p>
                 <span class="rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase" :class="p.status === 'paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'">
-                  {{ p.status }}
+                  {{ p.status === 'paid' ? 'Dibayar' : 'Draft' }}
                 </span>
               </div>
             </div>
@@ -295,27 +297,26 @@ const filteredAttendance = computed(() => {
 
 const payrollHistory = ref<Payroll[]>([])
 
-const periodCode = (periodId: string) =>
-  store.payrollPeriods.find((per) => per.id === periodId)?.period_code || 'Periode'
-
 const employeePayrolls = computed(() => {
   return payrollHistory.value.filter((p) => p.employee_id === route.params.id).sort((a, b) => b.created_at.localeCompare(a.created_at))
 })
+
+const formatDate = (d: string) => {
+  if (!d) return '-'
+  const [y, m, day] = d.split('-')
+  return `${day}/${m}/${y.slice(2)}`
+}
+
+const getPayrollStatusLabel = (status: string) => (status === 'paid' ? 'Dibayar' : 'Draft')
 
 onMounted(async () => {
   try {
     await Promise.all([
       store.fetchEmployees(),
       store.fetchAttendance(),
-      store.fetchPayrollPeriods(),
     ])
-    // Riwayat payroll per karyawan: ambil slip dari tiap periode
-    // (store.payrolls hanya berisi slip periode terakhir yang dibuka)
-    const periods = store.payrollPeriods.slice(0, 12)
-    const chunks = await Promise.all(
-      periods.map((per) => store.fetchPayrolls(per.id).catch(() => [] as Payroll[]))
-    )
-    payrollHistory.value = chunks.flat().filter((p) => p.employee_id === route.params.id)
+    // Riwayat slip gaji langsung per karyawan (sistem per-karyawan)
+    payrollHistory.value = await store.fetchPayrolls(route.params.id as string)
   } catch (e: any) {
     toast.error('Gagal memuat data!', e.message)
   } finally {

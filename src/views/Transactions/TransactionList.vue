@@ -17,7 +17,7 @@
     </MobilePageHeader>
 
     <!-- Mobile Search & Filter -->
-    <div class="space-y-2 pb-1 md:hidden">
+    <div class="space-y-2 pt-2 pb-1 md:hidden">
       <!-- Search Bar -->
       <div class="relative">
         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -44,6 +44,30 @@
 
       <!-- Filter Buttons -->
       <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        <!-- Buka modal filter lengkap -->
+        <button
+          @click="showFilterModal = true"
+          :class="[
+            'relative flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors',
+            mobileAdvancedFilterCount > 0
+              ? 'border-brand-500 bg-brand-500 text-white'
+              : 'border-gray-300 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'
+          ]"
+        >
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          </svg>
+          Filter
+          <span
+            v-if="mobileAdvancedFilterCount > 0"
+            class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-error-500 text-[9px] font-bold text-white"
+          >
+            {{ mobileAdvancedFilterCount }}
+          </span>
+        </button>
+
+        <span class="h-4 w-px flex-shrink-0 bg-gray-200 dark:bg-gray-700"></span>
+
         <!-- Status transaksi (dropdown) -->
         <div class="flex-shrink-0 w-36">
           <SelectField
@@ -70,6 +94,27 @@
           ]"
         >
           {{ opt.label }}
+        </button>
+      </div>
+
+      <!-- Chip filter aktif dari modal -->
+      <div v-if="activeFilterChips.length" class="flex flex-wrap gap-1.5">
+        <button
+          v-for="chip in activeFilterChips"
+          :key="chip.key"
+          @click="removeFilterChip(chip.key)"
+          class="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"
+        >
+          {{ chip.label }}
+          <svg class="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <button
+          @click="clearModalFilters"
+          class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-medium text-gray-500 underline decoration-dotted dark:text-gray-400"
+        >
+          Hapus semua
         </button>
       </div>
     </div>
@@ -158,7 +203,18 @@
 
           <!-- Status Transaksi (ubah status) -->
           <div v-if="transaction.status !== 'void' && transaction.status !== 'batal'" class="border-t border-gray-100 pt-2 dark:border-gray-800">
-            <label class="mb-1 block text-[10px] text-gray-500 dark:text-gray-400">Status Transaksi</label>
+            <div class="mb-1 flex items-center justify-between">
+              <label class="block text-[10px] text-gray-500 dark:text-gray-400">Status Transaksi</label>
+              <span
+                v-if="lockedShippingTxIds.has(transaction.id)"
+                class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+              >
+                <svg class="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Terkunci — surat jalan selesai
+              </span>
+            </div>
             <SelectField
               :model-value="transaction.transaction_status ?? 'disiapkan'"
               :options="[
@@ -167,7 +223,7 @@
                 { label: 'Selesai', value: 'selesai' },
               ]"
               title="Pilih Status Transaksi"
-              :disabled="statusUpdatingId === transaction.id"
+              :disabled="statusUpdatingId === transaction.id || lockedShippingTxIds.has(transaction.id)"
               button-class="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               @update:model-value="(value) => changeTransactionStatus(transaction, value as TransactionStatus)"
             />
@@ -479,6 +535,15 @@
       </DataTable>
     </div>
 
+    <!-- Mobile Filter Modal -->
+    <TransactionFilterModal
+      :is-open="showFilterModal"
+      :model-value="modalFilters"
+      :customer-options="customerFilterOptions"
+      @close="showFilterModal = false"
+      @apply="onModalApply"
+    />
+
     <!-- Delete Confirmation Dialog -->
     <ConfirmDialog
       v-model="showDeleteDialog"
@@ -512,7 +577,9 @@ import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import SelectField from '@/components/common/SelectField.vue'
+import TransactionFilterModal from '@/components/common/TransactionFilterModal.vue'
 import { useTransactionsStore } from '@/stores/transactions'
+import { useShippingStore } from '@/stores/shipping'
 import { useStoreSettingsStore } from '@/stores/storeSettings'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
@@ -520,6 +587,7 @@ import type { TransactionStatus } from '@/types/database'
 
 const router = useRouter()
 const transactionsStore = useTransactionsStore()
+const shippingStore = useShippingStore()
 const settingsStore = useStoreSettingsStore()
 const toast = useToast()
 
@@ -537,22 +605,115 @@ const searchQuery = ref('')
 const transactionStatusFilter = ref<'semua' | TransactionStatus>('semua')
 const paymentFilter = ref<'semua' | 'lunas' | 'belum_lunas'>('semua')
 
+// Filter lengkap (modal mobile)
+const showFilterModal = ref(false)
+
+interface ModalFilterValues {
+  transactionStatus: string
+  paymentStatus: string
+  paymentMethod: string
+  recordStatus: string
+  customer: string
+  dateFrom: string
+  dateTo: string
+  minAmount: string
+  maxAmount: string
+  sortOrder: string
+}
+
+const emptyModalFilters = (): ModalFilterValues => ({
+  transactionStatus: 'semua',
+  paymentStatus: 'semua',
+  paymentMethod: '',
+  recordStatus: 'semua',
+  customer: '',
+  dateFrom: '',
+  dateTo: '',
+  minAmount: '',
+  maxAmount: '',
+  sortOrder: 'newest',
+})
+
+const modalFilters = ref<ModalFilterValues>(emptyModalFilters())
+
+const onModalApply = (values: ModalFilterValues) => {
+  modalFilters.value = { ...values }
+  // Sinkronkan kontrol cepat dengan nilai modal (satu sumber kebenaran)
+  transactionStatusFilter.value = values.transactionStatus as any
+  paymentFilter.value = values.paymentStatus as any
+}
+
+// Kontrol cepat → nilai modal
+watch(transactionStatusFilter, (v) => {
+  modalFilters.value.transactionStatus = v
+})
+watch(paymentFilter, (v) => {
+  modalFilters.value.paymentStatus = v
+})
+
+// Opsi customer (unik, dari data transaksi)
+const customerFilterOptions = computed(() => {
+  const names = new Set<string>()
+  for (const t of transactionsStore.transactions) {
+    if (t.customer_name) names.add(t.customer_name)
+  }
+  return [...names].sort((a, b) => a.localeCompare(b)).map((name) => ({ value: name, label: name }))
+})
+
+const isBatal = (t: any) => t.status === 'void' || t.status === 'batal'
+
 const filteredTransactions = computed(() => {
+  const f = modalFilters.value
   let result = [...transactionsStore.transactions]
 
+  // Status catatan (aktif / batal)
+  if (f.recordStatus === 'aktif') {
+    result = result.filter((t) => !isBatal(t))
+  } else if (f.recordStatus === 'batal') {
+    result = result.filter((t) => isBatal(t))
+  }
+
   // Filter status transaksi (disiapkan / dikirim / selesai)
-  if (transactionStatusFilter.value !== 'semua') {
-    result = result.filter((t) => (t.transaction_status ?? 'disiapkan') === transactionStatusFilter.value)
+  if (f.transactionStatus !== 'semua') {
+    result = result.filter((t) => (t.transaction_status ?? 'disiapkan') === f.transactionStatus)
   }
 
   // Filter status pembayaran (lunas / belum lunas)
-  if (paymentFilter.value !== 'semua') {
+  if (f.paymentStatus !== 'semua') {
     result = result.filter((t) =>
-      paymentFilter.value === 'lunas'
+      f.paymentStatus === 'lunas'
         ? t.payment_status === 'lunas' || t.remaining_amount <= 0
         : t.payment_status !== 'lunas' && t.remaining_amount > 0
     )
   }
+
+  // Metode pembayaran
+  if (f.paymentMethod) {
+    result = result.filter((t) => t.payment_method === f.paymentMethod)
+  }
+
+  // Customer
+  if (f.customer === '__tanpa__') {
+    result = result.filter((t) => !t.customer_name)
+  } else if (f.customer) {
+    result = result.filter((t) => t.customer_name === f.customer)
+  }
+
+  // Periode tanggal
+  if (f.dateFrom) {
+    const from = new Date(f.dateFrom + 'T00:00:00')
+    result = result.filter((t) => new Date(t.created_at) >= from)
+  }
+  if (f.dateTo) {
+    const to = new Date(f.dateTo + 'T23:59:59.999')
+    result = result.filter((t) => new Date(t.created_at) <= to)
+  }
+
+  // Rentang nominal
+  const min = Number(f.minAmount)
+  const max = Number(f.maxAmount)
+  if (f.minAmount && !Number.isNaN(min)) result = result.filter((t) => t.total >= min)
+  if (f.maxAmount && !Number.isNaN(max)) result = result.filter((t) => t.total <= max)
 
   // Pencarian
   const query = searchQuery.value.trim().toLowerCase()
@@ -569,6 +730,21 @@ const filteredTransactions = computed(() => {
     })
   }
 
+  // Pengurutan
+  switch (f.sortOrder) {
+    case 'oldest':
+      result.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      break
+    case 'highest':
+      result.sort((a, b) => b.total - a.total)
+      break
+    case 'lowest':
+      result.sort((a, b) => a.total - b.total)
+      break
+    default:
+      result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }
+
   return result
 })
 
@@ -583,9 +759,9 @@ const totalPages = computed(() => {
 })
 
 // Reset ke halaman 1 ketika filter/pencarian berubah
-watch([searchQuery, transactionStatusFilter, paymentFilter], () => {
+watch([searchQuery, transactionStatusFilter, paymentFilter, modalFilters], () => {
   currentPage.value = 1
-})
+}, { deep: true })
 
 // Opsi filter status transaksi (dropdown)
 const transactionStatusOptions = [
@@ -601,18 +777,71 @@ const paymentOptions = [
   { value: 'belum_lunas', label: 'Belum Lunas' },
 ] as const
 
+const paymentMethodLabels: Record<string, string> = {
+  tunai: 'Tunai',
+  transfer: 'Transfer',
+  qris: 'QRIS',
+  tempo: 'Tempo',
+}
+
+const formatShortDate = (ymd: string) => {
+  const d = new Date(ymd + 'T00:00:00')
+  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })
+}
+
+// Chip filter aktif dari modal (di luar kontrol cepat status/pembayaran)
+const activeFilterChips = computed(() => {
+  const f = modalFilters.value
+  const chips: { key: string; label: string }[] = []
+  if (f.recordStatus !== 'semua') {
+    chips.push({ key: 'recordStatus', label: f.recordStatus === 'aktif' ? 'Aktif saja' : 'Dibatalkan' })
+  }
+  if (f.paymentMethod) {
+    chips.push({ key: 'paymentMethod', label: paymentMethodLabels[f.paymentMethod] || f.paymentMethod })
+  }
+  if (f.customer) {
+    chips.push({ key: 'customer', label: f.customer === '__tanpa__' ? 'Tanpa customer' : f.customer })
+  }
+  if (f.dateFrom || f.dateTo) {
+    const from = f.dateFrom ? formatShortDate(f.dateFrom) : '...'
+    const to = f.dateTo ? formatShortDate(f.dateTo) : '...'
+    chips.push({ key: 'date', label: `${from} – ${to}` })
+  }
+  if (f.minAmount) chips.push({ key: 'minAmount', label: `≥ ${formatCurrency(Number(f.minAmount))}` })
+  if (f.maxAmount) chips.push({ key: 'maxAmount', label: `≤ ${formatCurrency(Number(f.maxAmount))}` })
+  if (f.sortOrder !== 'newest') {
+    const labels: Record<string, string> = { oldest: 'Terlama', highest: 'Nominal tertinggi', lowest: 'Nominal terendah' }
+    chips.push({ key: 'sortOrder', label: labels[f.sortOrder] || f.sortOrder })
+  }
+  return chips
+})
+
+const mobileAdvancedFilterCount = computed(() => activeFilterChips.value.length)
+
+const removeFilterChip = (key: string) => {
+  if (key === 'date') {
+    modalFilters.value.dateFrom = ''
+    modalFilters.value.dateTo = ''
+  } else if (key === 'sortOrder') {
+    modalFilters.value.sortOrder = 'newest'
+  } else {
+    (modalFilters.value as any)[key] = key === 'recordStatus' ? 'semua' : ''
+  }
+}
+
+const clearModalFilters = () => {
+  modalFilters.value = emptyModalFilters()
+  transactionStatusFilter.value = 'semua'
+  paymentFilter.value = 'semua'
+}
+
 const hasActiveFilter = computed(() => {
-  return (
-    searchQuery.value.trim() !== '' ||
-    transactionStatusFilter.value !== 'semua' ||
-    paymentFilter.value !== 'semua'
-  )
+  return searchQuery.value.trim() !== '' || mobileAdvancedFilterCount.value > 0 || transactionStatusFilter.value !== 'semua' || paymentFilter.value !== 'semua'
 })
 
 const clearFilters = () => {
+  clearModalFilters()
   searchQuery.value = ''
-  transactionStatusFilter.value = 'semua'
-  paymentFilter.value = 'semua'
 }
 
 const toggleExpand = (id: string) => {
@@ -679,8 +908,23 @@ const transactionStatusBadge = (value?: string) => {
 
 const statusUpdatingId = ref<string | null>(null)
 
+// Transaksi yang dirujuk surat jalan berstatus "selesai" → status pengirimannya terkunci
+const lockedShippingTxIds = computed(() => {
+  const ids = new Set<string>()
+  for (const d of shippingStore.deliveryOrders || []) {
+    if (d.status === 'selesai') {
+      for (const txId of d.transaction_ids || []) ids.add(txId)
+    }
+  }
+  return ids
+})
+
 const changeTransactionStatus = async (transaction: any, value: TransactionStatus) => {
   if (!value || value === transaction.transaction_status) return
+  if (lockedShippingTxIds.value.has(transaction.id)) {
+    toast.warning('Terkunci', 'Status tidak bisa diubah karena surat jalannya sudah selesai')
+    return
+  }
   statusUpdatingId.value = transaction.id
   try {
     await transactionsStore.updateTransactionStatus(transaction.id, value)
@@ -713,7 +957,12 @@ const formatDate = (value: string) => {
 
 onMounted(async () => {
   try {
-    await transactionsStore.fetchTransactions()
+    await Promise.all([
+      transactionsStore.fetchTransactions(),
+      shippingStore.fetchDeliveryOrders().catch(() => {
+        /* daftar pengiriman hanya untuk lock; gagal muat tidak menggagalkan halaman */
+      }),
+    ])
   } catch (error) {
     console.error('Error loading transactions:', error)
     toast.error('Gagal!', 'Gagal memuat data transaksi')

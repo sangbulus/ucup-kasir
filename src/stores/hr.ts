@@ -9,9 +9,6 @@ import type {
   Attendance,
   AttendanceInsert,
   AttendanceUpdate,
-  PayrollComponent,
-  PayrollComponentInsert,
-  PayrollComponentUpdate,
   Payroll,
   PayrollInsert,
   PayrollUpdate,
@@ -26,9 +23,8 @@ import type {
 // Store: HR & Payroll — Manajemen Karyawan
 // - Master: Karyawan (jabatan = teks 'supir' | 'loader')
 // - Absensi
-// - Komponen Payroll
+// - Payroll per-karyawan (periode individual, input kasbon manual)
 // - Kasbon (employee_loans)
-// - Payroll per-karyawan (periode individual)
 // ============================================================
 
 export const useHrStore = defineStore('hr', () => {
@@ -38,7 +34,6 @@ export const useHrStore = defineStore('hr', () => {
   const employees = ref<Employee[]>([])
   const employeesWithStats = ref<EmployeeWithStats[]>([])
   const attendance = ref<Attendance[]>([])
-  const payrollComponents = ref<PayrollComponent[]>([])
   const payrolls = ref<Payroll[]>([])
   const employeeLoans = ref<EmployeeLoan[]>([])
   const loading = ref(false)
@@ -220,70 +215,6 @@ export const useHrStore = defineStore('hr', () => {
   }
 
   // ============================================================
-  // PAYROLL COMPONENTS
-  // ============================================================
-
-  async function fetchPayrollComponents() {
-    loading.value = true
-    error.value = null
-    try {
-      payrollComponents.value = await hrServiceAdapter.fetchPayrollComponents()
-      return payrollComponents.value
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function createPayrollComponent(input: PayrollComponentInsert) {
-    loading.value = true
-    error.value = null
-    try {
-      const created = await hrServiceAdapter.createPayrollComponent(input)
-      // Ambil ulang agar field join (position/employee untuk kolom "Berlaku") terisi
-      await fetchPayrollComponents()
-      return created
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function updatePayrollComponent(id: string, updates: PayrollComponentUpdate) {
-    loading.value = true
-    error.value = null
-    try {
-      const updated = await hrServiceAdapter.updatePayrollComponent(id, updates)
-      // Ambil ulang agar field join (position/employee untuk kolom "Berlaku") terisi
-      await fetchPayrollComponents()
-      return updated
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function deletePayrollComponent(id: string) {
-    loading.value = true
-    error.value = null
-    try {
-      await hrServiceAdapter.deletePayrollComponent(id)
-      payrollComponents.value = payrollComponents.value.filter((c) => c.id !== id)
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // ============================================================
   // PAYROLLS (Per-Karyawan dengan Periode Individual)
   // ============================================================
 
@@ -314,11 +245,25 @@ export const useHrStore = defineStore('hr', () => {
     }
   }
 
-  async function createPayroll(input: PayrollInsert) {
+  /**
+   * Generate payroll untuk 1 karyawan
+   * Backend akan auto-hitung: base_salary, incentive dari surat jalan
+   */
+  async function generatePayroll(
+    employeeId: string,
+    periodStart: string,
+    periodEnd: string,
+    kasbonDeduction: number = 0
+  ) {
     loading.value = true
     error.value = null
     try {
-      const created = await hrServiceAdapter.createPayroll(input)
+      const created = await hrServiceAdapter.generatePayroll(
+        employeeId,
+        periodStart,
+        periodEnd,
+        kasbonDeduction
+      )
       payrolls.value.unshift(created)
       return created
     } catch (e: any) {
@@ -365,41 +310,9 @@ export const useHrStore = defineStore('hr', () => {
     loading.value = true
     error.value = null
     try {
-      const journalId = await hrServiceAdapter.postPayrollJournal(payrollId)
-      // Update status payroll jadi paid
-      const index = payrolls.value.findIndex((p) => p.id === payrollId)
-      if (index !== -1) {
-        payrolls.value[index] = { ...payrolls.value[index], status: 'paid' }
-      }
-      return journalId
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-
-  // ============================================================
-  // EMPLOYEE LOANS (KASBON)
-  // ============================================================
-    error.value = null
-    try {
-      await hrServiceAdapter.deletePayroll(id)
-      payrolls.value = payrolls.value.filter((p) => p.id !== id)
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function fetchPayrollSummary() {
-    loading.value = true
-    error.value = null
-    try {
-      payrollSummary.value = await hrServiceAdapter.getPayrollSummary()
-      return payrollSummary.value
+      await hrServiceAdapter.postPayrollJournal(payrollId)
+      // Refresh untuk update status + journal_entry_id
+      await fetchPayrolls()
     } catch (e: any) {
       error.value = e.message
       throw e
@@ -509,7 +422,6 @@ export const useHrStore = defineStore('hr', () => {
     employees,
     employeesWithStats,
     attendance,
-    payrollComponents,
     payrolls,
     employeeLoans,
     loading,
@@ -525,13 +437,9 @@ export const useHrStore = defineStore('hr', () => {
     updateAttendance,
     deleteAttendance,
     bulkCreateAttendance,
-    fetchPayrollComponents,
-    createPayrollComponent,
-    updatePayrollComponent,
-    deletePayrollComponent,
     fetchPayrolls,
     getPayroll,
-    createPayroll,
+    generatePayroll,
     updatePayroll,
     deletePayroll,
     postPayrollJournal,
