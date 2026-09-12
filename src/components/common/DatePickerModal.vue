@@ -172,17 +172,17 @@
                     v-for="cell in calendarCells"
                     :key="cell.key"
                     type="button"
-                    :disabled="!cell.inMonth"
+                    :disabled="!cell.inMonth || isAfterMaxDate(cell.date)"
                     @click="selectDay(cell.date)"
                     :class="[
                       'flex h-8 w-full items-center justify-center rounded-lg text-xs font-medium transition',
-                      cell.inMonth
+                      cell.inMonth && !isAfterMaxDate(cell.date)
                         ? isSameDay(cell.date, selected)
                           ? 'bg-brand-600 text-white shadow-sm'
                           : isSameDay(cell.date, now)
                             ? 'text-brand-600 dark:text-brand-400'
                             : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.05]'
-                        : 'text-gray-300 dark:text-gray-700'
+                        : 'cursor-not-allowed text-gray-300 dark:text-gray-700'
                     ]"
                   >
                     {{ cell.date.getDate() }}
@@ -302,12 +302,15 @@ interface Props {
   title?: string
   /** Tampilkan input jam & menit (default: true). Set false untuk pemilih tanggal saja. */
   showTime?: boolean
+  /** Tanggal maksimal yang bisa dipilih (format datetime-local). Tanggal setelahnya akan disabled. */
+  maxDate?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   value: '',
   title: 'Tanggal Transaksi',
   showTime: true,
+  maxDate: undefined,
 })
 
 const emit = defineEmits<{
@@ -316,6 +319,21 @@ const emit = defineEmits<{
 }>()
 
 const now = new Date()
+
+// P2 FIX: Parse maxDate prop menjadi Date object
+const maxDateObj = computed(() => {
+  if (!props.maxDate) return null
+  const d = new Date(props.maxDate)
+  return isNaN(d.getTime()) ? null : d
+})
+
+// P2 FIX: Helper untuk cek apakah tanggal melewati maxDate (hanya compare tanggal, bukan jam)
+const isAfterMaxDate = (date: Date): boolean => {
+  if (!maxDateObj.value) return false
+  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const maxOnly = new Date(maxDateObj.value.getFullYear(), maxDateObj.value.getMonth(), maxDateObj.value.getDate())
+  return dateOnly > maxOnly
+}
 
 const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 const monthNames = [
@@ -486,6 +504,10 @@ const setDatePreset = (preset: 'today' | 'yesterday') => {
   const d = new Date()
   if (preset === 'yesterday') {
     d.setDate(d.getDate() - 1)
+  }
+  // P2 FIX: Jangan set jika melewati maxDate
+  if (isAfterMaxDate(d)) {
+    return
   }
   d.setHours(selectedHour.value, selectedMinute.value, 0, 0)
   selected.value = d

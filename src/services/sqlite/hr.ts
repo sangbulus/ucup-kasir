@@ -420,7 +420,7 @@ export const sqliteHrService = {
    * Kredit: akun Hutang Gaji. Akun dicari via tipe+nama (enum lokal:
    * 'beban' / 'kewajiban'), bukan kode tetap.
    */
-  async postPayrollJournal(payrollId: string): Promise<void> {
+  async postPayrollJournal(payrollId: string): Promise<Payroll> {
     const userId = getCurrentUserId()
     const now = nowIso()
 
@@ -490,17 +490,21 @@ export const sqliteHrService = {
 
     // Queue slip (status paid) + jurnal (header+lines lewat embedded self-heal syncEngine)
     const paid = await this.getPayroll(payrollId)
+    if (!paid) throw new Error('Slip gaji tidak ditemukan setelah diposting')
+    
     await addToSyncQueue(
       'UPDATE',
       'payrolls',
       payrollId,
-      paid || { id: payrollId, status: 'paid', journal_entry_id: journalId, paid_at: now }
+      paid
     )
     const { sqliteFinanceService } = await import('./finance')
     const journal = await sqliteFinanceService.getJournal(journalId)
     if (journal) {
       await addToSyncQueue('INSERT', 'journal_entries', journalId, journal)
     }
+
+    return paid
   },
 
   /**

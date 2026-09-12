@@ -251,6 +251,7 @@ import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DateField from '@/components/common/DateField.vue'
 import { useFinanceStore } from '@/stores/finance'
 import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
+import { localTodayStr, localDateOffsetStr, localDateStr } from '@/utils/date'
 
 const store = useFinanceStore()
 
@@ -283,8 +284,8 @@ const endDate = ref('')
 
 const tempRange = ref('thisMonth')
 const tempCustom = ref({
-  start: new Date().toISOString().split('T')[0],
-  end: new Date().toISOString().split('T')[0],
+  start: localTodayStr(),
+  end: localTodayStr(),
 })
 
 const rangeOptions = [
@@ -310,46 +311,47 @@ const formatDateRange = () => {
   return `${new Date(startDate.value).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} - ${new Date(endDate.value).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`
 }
 
+// Anti race-condition: respons request lama tidak boleh menimpa hasil request baru
+let fetchSeq = 0
 const fetchData = async () => {
+  const seq = ++fetchSeq
   loading.value = true
   error.value = null
   try {
-    cashFlow.value = await store.getCashFlow(
+    const cf = await store.getCashFlow(
       startDate.value || undefined,
       endDate.value || undefined
     )
+    if (seq !== fetchSeq) return
+    cashFlow.value = cf
   } catch (e: any) {
+    if (seq !== fetchSeq) return
     error.value = e.message
   } finally {
-    loading.value = false
+    if (seq === fetchSeq) loading.value = false
   }
 }
 
 const applyFilter = () => {
-  const today = new Date()
-  const endIso = today.toISOString().split('T')[0]
+  // Tanggal lokal — hindari bug UTC: toISOString() = kemarin sebelum jam 07:00 WIB
+  const endIso = localTodayStr()
 
   let start = ''
   switch (tempRange.value) {
     case 'today':
       start = endIso
       break
-    case '7days': {
-      const d7 = new Date(today)
-      d7.setDate(today.getDate() - 6)
-      start = d7.toISOString().split('T')[0]
+    case '7days':
+      start = localDateOffsetStr(-6)
       break
-    }
-    case '30days': {
-      const d30 = new Date(today)
-      d30.setDate(today.getDate() - 29)
-      start = d30.toISOString().split('T')[0]
+    case '30days':
+      start = localDateOffsetStr(-29)
       break
-    }
     default:
       start = tempCustom.value.start
   }
-  const end = tempRange.value === 'thisMonth' ? endIso : tempCustom.value.end
+  // Preset quick-range selalu berakhir hari ini (bukan nilai custom tertinggal)
+  const end = tempRange.value === 'custom' ? tempCustom.value.end || endIso : endIso
 
   startDate.value = start
   endDate.value = end
@@ -360,8 +362,8 @@ const applyFilter = () => {
 onMounted(async () => {
   const today = new Date()
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
-  startDate.value = firstDay.toISOString().split('T')[0]
-  endDate.value = today.toISOString().split('T')[0]
+  startDate.value = localDateStr(firstDay)
+  endDate.value = localTodayStr()
   await fetchData()
 })
 </script>

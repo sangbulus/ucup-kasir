@@ -6,6 +6,18 @@
     <MobilePageHeader title="Buku Besar" subtitle="Riwayat Saldo Per Akun" back-to="/quick-menu/keuangan">
       <template #actions>
         <button
+          v-if="selectedAccount"
+          @click="toggleViewMode"
+          class="mr-2 flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.03]"
+        >
+          <svg v-if="viewMode === 'list'" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+          </svg>
+        </button>
+        <button
           @click="showAccountModal = true"
           class="flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.03]"
         >
@@ -75,18 +87,18 @@
           <div class="text-right">
             <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Saldo Akhir</p>
             <p class="text-lg font-black" :class="ledgerNormalizedBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">
-              {{ formatCurrency(ledgerEndingBalance) }}
+              {{ formatCurrency(ledgerEndingDisplay) }}
             </p>
             <p v-if="startDate" class="text-[9px] text-gray-400 dark:text-gray-500">
-              Awal: {{ formatCurrency(ledger.balance) }}
+              Awal: {{ formatCurrency(ledgerStartDisplay) }}
             </p>
             <span
               class="mt-1.5 inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase"
-              :class="accountBalanced
+              :class="ledgerDkDiff === 0
                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
                 : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'"
             >
-              {{ accountBalanced ? '✓ Balance' : '✗ Tidak Balance' }}
+              {{ ledgerDkDiff === 0 ? '✓ D = K' : `✗ Selisih D−K ${formatCurrency(Math.abs(ledgerDkDiff))}` }}
             </span>
           </div>
         </div>
@@ -131,7 +143,7 @@
                 </td>
                 <td class="px-4 py-3 text-right text-xs font-bold text-emerald-600 dark:text-emerald-400">{{ entry.debit ? formatCurrency(entry.debit) : '-' }}</td>
                 <td class="px-4 py-3 text-right text-xs font-bold text-red-600 dark:text-red-400">{{ entry.credit ? formatCurrency(entry.credit) : '-' }}</td>
-                <td class="px-4 py-3 text-right text-xs font-bold" :class="normalizeBalance(entry.balance) >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-600 dark:text-red-400'">{{ formatCurrency(entry.balance) }}</td>
+                <td class="px-4 py-3 text-right text-xs font-bold" :class="normalizeBalance(entry.balance) >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-600 dark:text-red-400'">{{ formatCurrency(normalizeBalance(entry.balance)) }}</td>
               </tr>
               <tr v-if="ledger.entries.length === 0">
                 <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -144,14 +156,14 @@
                 <td class="px-4 py-3 text-xs font-bold text-gray-700 dark:text-gray-300" colspan="2">Total</td>
                 <td class="px-4 py-3 text-right text-xs font-bold text-emerald-700 dark:text-emerald-400">{{ formatCurrency(ledgerTotalDebit) }}</td>
                 <td class="px-4 py-3 text-right text-xs font-bold text-red-700 dark:text-red-400">{{ formatCurrency(ledgerTotalCredit) }}</td>
-                <td class="px-4 py-3 text-right text-xs font-bold text-gray-900 dark:text-white">{{ formatCurrency(ledgerEndingBalance) }}</td>
+                <td class="px-4 py-3 text-right text-xs font-bold text-gray-900 dark:text-white">{{ formatCurrency(ledgerEndingDisplay) }}</td>
               </tr>
             </tfoot>
           </table>
         </div>
 
-        <!-- Ledger Cards (Mobile) -->
-        <div class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm md:hidden dark:border-gray-800 dark:bg-gray-900">
+        <!-- Ledger Cards (Mobile) - List View -->
+        <div v-if="viewMode === 'list'" class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm md:hidden dark:border-gray-800 dark:bg-gray-900">
           <div class="mb-2.5 border-b border-gray-200 pb-2 dark:border-gray-700">
             <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Riwayat Transaksi</h3>
           </div>
@@ -176,7 +188,7 @@
                 </div>
                 <div class="flex-shrink-0 text-right">
                   <p class="text-[11px] font-bold" :class="normalizeBalance(entry.balance) >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-600 dark:text-red-400'">
-                    {{ formatCurrency(entry.balance) }}
+                    {{ formatCurrency(normalizeBalance(entry.balance)) }}
                   </p>
                 </div>
               </div>
@@ -207,19 +219,89 @@
             <div class="flex items-center justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
               <span class="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400">Saldo Akhir</span>
               <p class="text-[11px] font-bold" :class="ledgerNormalizedBalance >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-600 dark:text-red-400'">
-                {{ formatCurrency(ledgerEndingBalance) }}
+                {{ formatCurrency(ledgerEndingDisplay) }}
               </p>
             </div>
             <div class="mt-2 flex items-center justify-center">
               <span
                 class="inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase"
-                :class="accountBalanced
+                :class="ledgerDkDiff === 0
                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
                   : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'"
               >
-                {{ accountBalanced ? '✓ Balance' : '✗ Tidak Balance' }}
+                {{ ledgerDkDiff === 0 ? '✓ D = K' : `✗ Selisih D−K ${formatCurrency(Math.abs(ledgerDkDiff))}` }}
               </span>
             </div>
+          </div>
+        </div>
+
+        <!-- Ledger Table (Mobile) - Table View -->
+        <div v-else class="rounded-2xl border border-gray-200 bg-white shadow-sm md:hidden dark:border-gray-800 dark:bg-gray-900">
+          <div class="overflow-x-auto">
+            <div class="inline-block min-w-full align-middle">
+              <table class="min-w-full text-left">
+                <thead class="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+                  <tr>
+                    <th class="px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Tanggal</th>
+                    <th class="px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Keterangan</th>
+                    <th class="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Debit</th>
+                    <th class="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Kredit</th>
+                    <th class="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+                  <tr v-if="ledger.entries.length === 0">
+                    <td colspan="5" class="px-2 py-6 text-center text-xs text-gray-500 dark:text-gray-400">
+                      Belum ada transaksi di akun ini.
+                    </td>
+                  </tr>
+                  <tr
+                    v-for="(entry, i) in ledger.entries"
+                    :key="i"
+                    class="hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <td class="px-2 py-2 text-[9px] text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      {{ formatDateShort(entry.entry_date) }}
+                    </td>
+                    <td class="px-2 py-2">
+                      <div class="min-w-[120px]">
+                        <p class="text-[10px] font-medium text-gray-900 dark:text-white line-clamp-2">{{ entry.description }}</p>
+                        <span v-if="entry.reference_type" class="mt-0.5 inline-block rounded px-1 py-0.5 text-[8px] font-bold uppercase" :class="getRefBadge(entry.reference_type)">
+                          {{ getRefLabel(entry.reference_type) }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="px-2 py-2 text-right text-[10px] font-bold whitespace-nowrap" :class="entry.debit ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-300 dark:text-gray-700'">
+                      {{ entry.debit ? formatCurrency(entry.debit) : '—' }}
+                    </td>
+                    <td class="px-2 py-2 text-right text-[10px] font-bold whitespace-nowrap" :class="entry.credit ? 'text-red-600 dark:text-red-400' : 'text-gray-300 dark:text-gray-700'">
+                      {{ entry.credit ? formatCurrency(entry.credit) : '—' }}
+                    </td>
+                    <td class="px-2 py-2 text-right text-[10px] font-bold whitespace-nowrap" :class="normalizeBalance(entry.balance) >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-600 dark:text-red-400'">
+                      {{ formatCurrency(normalizeBalance(entry.balance)) }}
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot class="border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+                  <tr>
+                    <td class="px-2 py-2 text-[9px] font-bold text-gray-700 dark:text-gray-300" colspan="2">Total</td>
+                    <td class="px-2 py-2 text-right text-[10px] font-bold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">{{ formatCurrency(ledgerTotalDebit) }}</td>
+                    <td class="px-2 py-2 text-right text-[10px] font-bold text-red-700 dark:text-red-400 whitespace-nowrap">{{ formatCurrency(ledgerTotalCredit) }}</td>
+                    <td class="px-2 py-2 text-right text-[10px] font-bold text-gray-900 dark:text-white whitespace-nowrap">{{ formatCurrency(ledgerEndingDisplay) }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+          <div class="border-t border-gray-200 p-2.5 text-center dark:border-gray-700">
+            <span
+              class="inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase"
+              :class="ledgerDkDiff === 0
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'"
+            >
+              {{ ledgerDkDiff === 0 ? '✓ D = K' : `✗ Selisih D−K ${formatCurrency(Math.abs(ledgerDkDiff))}` }}
+            </span>
           </div>
         </div>
       </template>
@@ -352,6 +434,14 @@ const showFilterModal = ref(false)
 useAutoNavigationStack(showAccountModal, 'general-ledger-account-modal')
 useAutoNavigationStack(showFilterModal, 'general-ledger-filter-modal')
 
+// View mode state (list atau table) - simpan ke localStorage
+const viewMode = ref<'list' | 'table'>((localStorage.getItem('ledger-view-mode') as 'list' | 'table') || 'list')
+
+const toggleViewMode = () => {
+  viewMode.value = viewMode.value === 'list' ? 'table' : 'list'
+  localStorage.setItem('ledger-view-mode', viewMode.value)
+}
+
 // Date filter state
 const startDate = ref<string | undefined>(undefined)
 const endDate = ref<string | undefined>(undefined)
@@ -377,15 +467,22 @@ const ledgerEndingBalance = computed(() => {
 // Normalisasi saldo ke arah normal akun:
 //   aset/beban  → saldo debit = positif normal
 //   kewajiban/ekuitas/pendapatan → saldo kredit = positif normal
+// Service mengembalikan saldo dalam BASIS DEBIT MENTAH (debit - credit), jadi
+// display WAJIB dinormalisasi dulu — kalau tidak, akun pendapatan/kewajiban
+// tampil negatif padahal normal (bug lama: warna dan angka tidak satu basis).
 const normalizeBalance = (value: number) => {
   if (!selectedAccount.value) return value
   return selectedAccount.value.normal_balance === 'debit' ? value : -value
 }
 
 const ledgerNormalizedBalance = computed(() => normalizeBalance(ledgerEndingBalance.value))
+const ledgerEndingDisplay = computed(() => ledgerNormalizedBalance.value)
+const ledgerStartDisplay = computed(() => normalizeBalance(ledger.value.balance || 0))
 
-// Balance = saldo akhir searah dengan normal akun (positif setelah normalisasi)
-const accountBalanced = computed(() => ledgerNormalizedBalance.value >= 0)
+// Selisih mutasi D−K dalam rentang — indikator informatif, bukan "balance/tidak"
+// (untuk satu akun, saldo akhir tidak pernah benar-benar "balance"; yang bermakna
+// adalah nol hanya jika rentang mencakup seluruh riwayat akun).
+const ledgerDkDiff = computed(() => ledgerTotalDebit.value - ledgerTotalCredit.value)
 
 const getTypeLabel = (type: string) => {
   const labels: Record<string, string> = {
@@ -443,20 +540,29 @@ const formatCurrency = (value: number) =>
 const formatDate = (dateString: string) =>
   new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 
+const formatDateShort = (dateString: string) =>
+  new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+
+// Anti race-condition: ganti akun/Filter cepat → respons lama tidak menimpa baru
+let fetchSeq = 0
 const fetchLedger = async () => {
   if (!selectedAccount.value) return
+  const seq = ++fetchSeq
   loading.value = true
   error.value = null
   try {
-    ledger.value = await store.getLedger(
+    const result = await store.getLedger(
       selectedAccount.value.id,
       startDate.value || undefined,
       endDate.value || undefined
     )
+    if (seq !== fetchSeq) return
+    ledger.value = result
   } catch (e: any) {
+    if (seq !== fetchSeq) return
     error.value = e.message
   } finally {
-    loading.value = false
+    if (seq === fetchSeq) loading.value = false
   }
 }
 

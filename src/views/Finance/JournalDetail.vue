@@ -78,8 +78,8 @@
           <tfoot class="border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
             <tr>
               <td class="px-4 py-3 text-xs font-bold text-gray-700 dark:text-gray-300" colspan="2">Total</td>
-              <td class="px-4 py-3 text-right text-xs font-bold text-emerald-700 dark:text-emerald-400">{{ formatCurrency(journalTotal) }}</td>
-              <td class="px-4 py-3 text-right text-xs font-bold text-red-700 dark:text-red-400">{{ formatCurrency(journalTotal) }}</td>
+              <td class="px-4 py-3 text-right text-xs font-bold text-emerald-700 dark:text-emerald-400">{{ formatCurrency(journalTotalDebit) }}</td>
+              <td class="px-4 py-3 text-right text-xs font-bold text-red-700 dark:text-red-400">{{ formatCurrency(journalTotalCredit) }}</td>
             </tr>
           </tfoot>
         </table>
@@ -115,8 +115,8 @@
           <div class="flex items-center justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
             <span class="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400">Total</span>
             <div class="text-right">
-              <p class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">D: {{ formatCurrency(journalTotal) }}</p>
-              <p class="text-[11px] font-bold text-red-600 dark:text-red-400">K: {{ formatCurrency(journalTotal) }}</p>
+              <p class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">D: {{ formatCurrency(journalTotalDebit) }}</p>
+              <p class="text-[11px] font-bold text-red-600 dark:text-red-400">K: {{ formatCurrency(journalTotalCredit) }}</p>
             </div>
           </div>
         </div>
@@ -133,9 +133,10 @@
         <button
           v-if="journal.status === 'posted'"
           @click="handleDelete"
-          class="flex-1 rounded-xl border border-red-500 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+          :disabled="deleting"
+          class="flex-1 rounded-xl border border-red-500 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-500/10"
         >
-          Hapus Jurnal
+          {{ deleting ? 'Menghapus...' : 'Hapus Jurnal' }}
         </button>
       </div>
     </template>
@@ -161,8 +162,11 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const journal = ref<JournalEntry | null>(null)
 
-const journalTotal = computed(() => {
+const journalTotalDebit = computed(() => {
   return (journal.value?.lines || []).reduce((s, l) => s + (l.debit || 0), 0)
+})
+const journalTotalCredit = computed(() => {
+  return (journal.value?.lines || []).reduce((s, l) => s + (l.credit || 0), 0)
 })
 
 const formatCurrency = (value: number) =>
@@ -204,13 +208,18 @@ const getRefBadge = (r: string) => {
   return badges[r] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
 }
 
+const deleting = ref(false)
 const handleDelete = async () => {
+  if (deleting.value) return
   if (!(await confirm('Hapus jurnal ini? Data akan dihapus permanen dan tidak dapat dikembalikan.'))) return
+  deleting.value = true
   try {
     await store.deleteJournal(journal.value!.id)
     router.push('/finance/journals')
   } catch (e: any) {
     error.value = e.message
+  } finally {
+    deleting.value = false
   }
 }
 

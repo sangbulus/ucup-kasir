@@ -682,12 +682,6 @@ const router = createRouter({
     // Modul HR & Payroll — Manajemen Karyawan
     // ============================================================
     {
-      path: '/hr',
-      name: 'HR Dashboard',
-      component: () => import('../views/Hr/HrDashboard.vue'),
-      meta: { title: 'Dashboard HR' },
-    },
-    {
       path: '/hr/employees',
       name: 'Employee List',
       component: () => import('../views/Hr/EmployeeList.vue'),
@@ -710,12 +704,6 @@ const router = createRouter({
       name: 'Edit Employee',
       component: () => import('../views/Hr/EmployeeForm.vue'),
       meta: { title: 'Edit Karyawan' },
-    },
-    {
-      path: '/hr/attendance',
-      name: 'Attendance List',
-      component: () => import('../views/Hr/AttendanceList.vue'),
-      meta: { title: 'Absensi' },
     },
     {
       path: '/hr/loans',

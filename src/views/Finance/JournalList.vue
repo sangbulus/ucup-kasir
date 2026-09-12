@@ -236,7 +236,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
@@ -244,6 +244,7 @@ import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DateField from '@/components/common/DateField.vue'
 import { useFinanceStore } from '@/stores/finance'
 import { useAutoNavigationStack } from '@/composables/useAutoNavigationStack'
+import { localDateFromIso } from '@/utils/date'
 import type { JournalEntry } from '@/types/database'
 
 const router = useRouter()
@@ -258,6 +259,7 @@ const statusOptions = [
 const periodFilter = ref<string>('semua')
 const periodOptions = [
   { value: 'semua', label: 'Semua' },
+  { value: 'terbaru', label: 'Terbaru' },
   { value: 'hari-ini', label: 'Hari Ini' },
   { value: 'minggu-ini', label: 'Minggu Ini' },
   { value: 'bulan-ini', label: 'Bulan Ini' },
@@ -297,6 +299,13 @@ const applyQuickPeriod = (period: string) => {
   }
 
   switch (period) {
+    case 'terbaru':
+      // 7 hari terakhir
+      const sevenDaysAgo = new Date(year, month, day - 7)
+      startDate.value = formatDate(sevenDaysAgo)
+      endDate.value = formatDate(new Date(year, month, day))
+      break
+
     case 'hari-ini':
       startDate.value = formatDate(new Date(year, month, day))
       endDate.value = formatDate(new Date(year, month, day))
@@ -333,8 +342,8 @@ const filteredJournals = computed(() => {
   // Filter berdasarkan rentang tanggal
   if (startDate.value || endDate.value) {
     journals = journals.filter((j) => {
-      // Ambil hanya bagian tanggal (YYYY-MM-DD) untuk perbandingan
-      const entryDateStr = j.entry_date.split('T')[0]
+      // Tanggal LOKAL dari timestamp (split('T') akan ambil bagian UTC → geser hari)
+      const entryDateStr = localDateFromIso(j.entry_date)
 
       if (startDate.value && entryDateStr < startDate.value) return false
       if (endDate.value && entryDateStr > endDate.value) return false
@@ -414,8 +423,14 @@ const getRefBadge = (ref: string) => {
 }
 
 onMounted(async () => {
-  if (store.journals.length === 0) {
-    await store.fetchJournals()
-  }
+  // Tampilkan semua jurnal sebagai default
+  // User bisa pilih filter periode jika perlu
+  await store.fetchJournals()
+})
+
+onActivated(async () => {
+  // Refresh journals setiap kali halaman diaktifkan (user kembali dari halaman lain)
+  // Ini memastikan jurnal baru langsung terlihat
+  await store.fetchJournals()
 })
 </script>

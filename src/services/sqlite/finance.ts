@@ -28,6 +28,7 @@ const DEFAULT_ACCOUNTS: Array<Omit<Account, 'id' | 'user_id' | 'created_at' | 'u
   { code: '1-1100', name: 'Piutang Usaha', type: 'aset', normal_balance: 'debit', is_active: true, is_system: true },
   { code: '1-1200', name: 'Persediaan Barang', type: 'aset', normal_balance: 'debit', is_active: true, is_system: true },
   { code: '2-2000', name: 'Utang Usaha', type: 'kewajiban', normal_balance: 'kredit', is_active: true, is_system: true },
+  { code: '2-2100', name: 'Hutang Gaji', type: 'kewajiban', normal_balance: 'kredit', is_active: true, is_system: true },
   { code: '3-3000', name: 'Modal Pemilik', type: 'ekuitas', normal_balance: 'kredit', is_active: true, is_system: true },
   { code: '3-3100', name: 'Laba Ditahan', type: 'ekuitas', normal_balance: 'kredit', is_active: true, is_system: true },
   { code: '4-4000', name: 'Pendapatan Penjualan', type: 'pendapatan', normal_balance: 'kredit', is_active: true, is_system: true },
@@ -40,6 +41,11 @@ const DEFAULT_ACCOUNTS: Array<Omit<Account, 'id' | 'user_id' | 'created_at' | 'u
   { code: '5-5500', name: 'Beban Transportasi', type: 'beban', normal_balance: 'debit', is_active: true, is_system: true },
   { code: '5-5600', name: 'Beban Lainnya', type: 'beban', normal_balance: 'debit', is_active: true, is_system: true },
 ]
+
+// Helper: Round ke 2 desimal untuk mencegah floating point error
+function round2(value: number): number {
+  return Math.round(value * 100) / 100
+}
 
 export const sqliteFinanceService = {
   // ============================================================
@@ -254,11 +260,16 @@ export const sqliteFinanceService = {
           [line.account_id, userId]
         )
         const acc = account[0]
+        
+        // Round debit/credit ke 2 desimal untuk mencegah floating point error
+        const debit = Math.round(Number(line.debit || 0) * 100) / 100
+        const credit = Math.round(Number(line.credit || 0) * 100) / 100
+        
         await tx.run(
           `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
           [lineId, userId, journalId, line.account_id, acc.code, acc.name,
-           Number(line.debit || 0), Number(line.credit || 0), now, now]
+           debit, credit, now, now]
         )
       }
     }).then(async () => {
@@ -486,31 +497,48 @@ export const sqliteFinanceService = {
     remainingAmount: number,
     totalCogs: number,
     entryDate: string,
-    now: string
+    now: string,
+    paymentMethod?: string
   ): Promise<string | null> {
     const journalId = uuid()
     const date = new Date().toISOString().split('T')[0].replace(/-/g, '')
     const suffix = Math.random().toString(36).substring(2, 8).toUpperCase()
     const journalNumber = `JRN-${date}-${suffix}`
 
-    // Cari akun
+    // Cari akun (termasuk Bank untuk pembayaran transfer/QRIS)
     const accounts = await tx.query<any>(
-      `SELECT id, code, name FROM chart_of_accounts WHERE user_id = ? AND code IN ('1-1000', '1-1100', '4-4000', '5-5000', '1-1200')`,
+      `SELECT id, code, name FROM chart_of_accounts WHERE user_id = ? AND code IN ('1-1000', '1-1010', '1-1100', '4-4000', '5-5000', '1-1200')`,
       [userId]
     )
     const accMap: Record<string, any> = {}
     for (const a of accounts) accMap[a.code] = a
 
     const kas = accMap['1-1000']
+    const bank = accMap['1-1010']
     const piutang = accMap['1-1100']
     const pendapatan = accMap['4-4000']
     const hpp = accMap['5-5000']
     const persediaan = accMap['1-1200']
 
-    // Validasi: semua akun yang dibutuhkan harus ada
-    if (!kas || !pendapatan) return null // COA belum di-seed
-    if (remainingAmount > 0 && !piutang) return null // Piutang dibutuhkan tapi tidak ada
-    if (totalCogs > 0 && (!hpp || !persediaan)) return null // HPP/Persediaan dibutuhkan tapi tidak ada
+    // Tentukan akun penerimaan berdasarkan payment_method
+    const isTransferOrQRIS = paymentMethod === 'transfer' || paymentMethod === 'qris'
+    const receivingAccount = isTransferOrQRIS ? bank : kas
+    const receivingAccountCode = isTransferOrQRIS ? '1-1010' : '1-1000'
+    const receivingAccountName = isTransferOrQRIS ? 'Bank' : 'Kas'
+
+    // Validasi: akun yang dibutuhkan harus ada
+    if (!kas || !pendapatan) {
+      throw new Error('Akun Kas atau Pendapatan Penjualan tidak ditemukan. Seed COA terlebih dahulu.')
+    }
+    if (isTransferOrQRIS && !bank) {
+      throw new Error('Akun Bank tidak ditemukan untuk pembayaran transfer/QRIS. Seed COA terlebih dahulu.')
+    }
+    if (remainingAmount > 0 && !piutang) {
+      throw new Error('Akun Piutang Usaha tidak ditemukan untuk transaksi kredit. Seed COA terlebih dahulu.')
+    }
+    if (totalCogs > 0 && (!hpp || !persediaan)) {
+      throw new Error('Akun HPP atau Persediaan tidak ditemukan. Seed COA terlebih dahulu.')
+    }
 
     // Simpan header jurnal
     await tx.run(
@@ -519,12 +547,12 @@ export const sqliteFinanceService = {
       [journalId, userId, journalNumber, entryDate, `Penjualan ${customerName || 'eceran'}`, transactionId, now, now, now]
     )
 
-    // Baris: Kas (debit)
-    if (paidAmount > 0) {
+    // Baris: Kas/Bank (debit) - tergantung payment_method
+    if (paidAmount > 0 && receivingAccount) {
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, kas.id, '1-1000', 'Kas', paidAmount, now, now]
+        [uuid(), userId, journalId, receivingAccount.id, receivingAccountCode, receivingAccountName, round2(paidAmount), now, now]
       )
     }
 
@@ -533,7 +561,7 @@ export const sqliteFinanceService = {
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, piutang.id, '1-1100', 'Piutang Usaha', remainingAmount, now, now]
+        [uuid(), userId, journalId, piutang.id, '1-1100', 'Piutang Usaha', round2(remainingAmount), now, now]
       )
     }
 
@@ -541,7 +569,7 @@ export const sqliteFinanceService = {
     await tx.run(
       `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
        VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'pending', ?)`,
-      [uuid(), userId, journalId, pendapatan.id, '4-4000', 'Pendapatan Penjualan', total, now, now]
+      [uuid(), userId, journalId, pendapatan.id, '4-4000', 'Pendapatan Penjualan', round2(total), now, now]
     )
 
     // Baris: HPP (debit) & Persediaan (kredit)
@@ -549,12 +577,12 @@ export const sqliteFinanceService = {
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, hpp.id, '5-5000', 'Harga Pokok Penjualan (HPP)', totalCogs, now, now]
+        [uuid(), userId, journalId, hpp.id, '5-5000', 'Harga Pokok Penjualan (HPP)', round2(totalCogs), now, now]
       )
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, persediaan.id, '1-1200', 'Persediaan Barang', totalCogs, now, now]
+        [uuid(), userId, journalId, persediaan.id, '1-1200', 'Persediaan Barang', round2(totalCogs), now, now]
       )
     }
 
@@ -562,7 +590,7 @@ export const sqliteFinanceService = {
   },
 
   /**
-   * Buat jurnal pembayaran cicilan (Piutang → Kas)
+   * Buat jurnal pembayaran cicilan (Piutang → Kas/Bank)
    */
   async postPaymentJournal(
     tx: TransactionExecutor,
@@ -570,22 +598,41 @@ export const sqliteFinanceService = {
     transactionId: string,
     paymentAmount: number,
     transactionNumber: string,
-    now: string
+    now: string,
+    paymentMethod?: string
   ): Promise<string | null> {
     const journalId = uuid()
     const date = new Date().toISOString().split('T')[0].replace(/-/g, '')
     const suffix = Math.random().toString(36).substring(2, 8).toUpperCase()
     const journalNumber = `JRN-${date}-${suffix}`
 
+    // Cari akun (termasuk Bank untuk pembayaran transfer/QRIS)
     const accounts = await tx.query<any>(
-      `SELECT id, code, name FROM chart_of_accounts WHERE user_id = ? AND code IN ('1-1000', '1-1100')`,
+      `SELECT id, code, name FROM chart_of_accounts WHERE user_id = ? AND code IN ('1-1000', '1-1010', '1-1100')`,
       [userId]
     )
     const accMap: Record<string, any> = {}
     for (const a of accounts) accMap[a.code] = a
     const kas = accMap['1-1000']
+    const bank = accMap['1-1010']
     const piutang = accMap['1-1100']
-    if (!kas || !piutang) return null
+    
+    // Tentukan akun penerimaan berdasarkan payment_method
+    const isTransferOrQRIS = paymentMethod === 'transfer' || paymentMethod === 'qris'
+    const receivingAccount = isTransferOrQRIS ? bank : kas
+    const receivingAccountCode = isTransferOrQRIS ? '1-1010' : '1-1000'
+    const receivingAccountName = isTransferOrQRIS ? 'Bank' : 'Kas'
+    
+    // Validasi: akun Kas dan Piutang harus ada
+    if (!kas || !piutang) {
+      throw new Error('Akun Kas atau Piutang Usaha tidak ditemukan. Seed COA terlebih dahulu.')
+    }
+    if (isTransferOrQRIS && !bank) {
+      throw new Error('Akun Bank tidak ditemukan untuk pembayaran transfer/QRIS. Seed COA terlebih dahulu.')
+    }
+    if (!receivingAccount) {
+      throw new Error(`Akun penerimaan (${receivingAccountName}) tidak ditemukan. Seed COA terlebih dahulu.`)
+    }
 
     await tx.run(
       `INSERT INTO journal_entries (id, user_id, journal_number, entry_date, description, reference_type, reference_id, status, created_at, updated_at, sync_status, updated_at_local)
@@ -596,12 +643,12 @@ export const sqliteFinanceService = {
     await tx.run(
       `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'pending', ?)`,
-      [uuid(), userId, journalId, kas.id, '1-1000', 'Kas', paymentAmount, now, now]
+      [uuid(), userId, journalId, receivingAccount.id, receivingAccountCode, receivingAccountName, round2(paymentAmount), now, now]
     )
     await tx.run(
       `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
        VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'pending', ?)`,
-      [uuid(), userId, journalId, piutang.id, '1-1100', 'Piutang Usaha', paymentAmount, now, now]
+      [uuid(), userId, journalId, piutang.id, '1-1100', 'Piutang Usaha', round2(paymentAmount), now, now]
     )
 
     return journalId
@@ -640,10 +687,18 @@ export const sqliteFinanceService = {
     const persediaan = accMap['1-1200']
 
     // Validasi: akun yang dibutuhkan harus ada
-    if (!pendapatan) return null
-    if (paidAmount > 0 && !kas) return null
-    if (remainingAmount > 0 && !piutang) return null
-    if (totalCogsReturned > 0 && (!hpp || !persediaan)) return null
+    if (!pendapatan) {
+      throw new Error('Akun Pendapatan Penjualan tidak ditemukan. Seed COA terlebih dahulu.')
+    }
+    if (paidAmount > 0 && !kas) {
+      throw new Error('Akun Kas tidak ditemukan untuk reversal pembayaran. Seed COA terlebih dahulu.')
+    }
+    if (remainingAmount > 0 && !piutang) {
+      throw new Error('Akun Piutang Usaha tidak ditemukan untuk reversal kredit. Seed COA terlebih dahulu.')
+    }
+    if (totalCogsReturned > 0 && (!hpp || !persediaan)) {
+      throw new Error('Akun HPP atau Persediaan tidak ditemukan untuk reversal stok. Seed COA terlebih dahulu.')
+    }
 
     await tx.run(
       `INSERT INTO journal_entries (id, user_id, journal_number, entry_date, description, reference_type, reference_id, status, created_at, updated_at, sync_status, updated_at_local)
@@ -655,24 +710,28 @@ export const sqliteFinanceService = {
     await tx.run(
       `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
        VALUES (?, ?, ?, ?, '4-4000', 'Pendapatan Penjualan', ?, 0, ?, 'pending', ?)`,
-      [uuid(), userId, journalId, pendapatan.id, totalRefund, now, now]
+      [uuid(), userId, journalId, pendapatan.id, round2(totalRefund), now, now]
     )
 
+    // Hitung refund proporsional: prioritas kas dulu, sisa ke piutang
+    const refundFromCash = round2(Math.min(totalRefund, paidAmount))
+    const refundFromAr = round2(totalRefund - refundFromCash)
+
     // Kredit Kas (dari yang sudah dibayar)
-    if (paidAmount > 0 && kas) {
+    if (refundFromCash > 0 && kas) {
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, '1-1000', 'Kas', 0, ?, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, kas.id, Math.min(totalRefund, paidAmount), now, now]
+        [uuid(), userId, journalId, kas.id, refundFromCash, now, now]
       )
     }
 
-    // Kredit Piutang
-    if (remainingAmount > 0 && piutang) {
+    // Kredit Piutang (sisa refund)
+    if (refundFromAr > 0 && piutang) {
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, '1-1100', 'Piutang Usaha', 0, ?, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, piutang.id, Math.min(totalRefund, remainingAmount), now, now]
+        [uuid(), userId, journalId, piutang.id, refundFromAr, now, now]
       )
     }
 
@@ -681,12 +740,12 @@ export const sqliteFinanceService = {
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, '1-1200', 'Persediaan Barang', ?, 0, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, persediaan.id, totalCogsReturned, now, now]
+        [uuid(), userId, journalId, persediaan.id, round2(totalCogsReturned), now, now]
       )
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, '5-5000', 'Harga Pokok Penjualan (HPP)', 0, ?, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, hpp.id, totalCogsReturned, now, now]
+        [uuid(), userId, journalId, hpp.id, round2(totalCogsReturned), now, now]
       )
     }
 
@@ -724,7 +783,19 @@ export const sqliteFinanceService = {
     const hpp = accMap['5-5000']
     const persediaan = accMap['1-1200']
 
-    if (!pendapatan) return null
+    // Validasi: akun yang dibutuhkan harus ada
+    if (!pendapatan) {
+      throw new Error('Akun Pendapatan Penjualan tidak ditemukan. Seed COA terlebih dahulu.')
+    }
+    if (paidAmount > 0 && !kas) {
+      throw new Error('Akun Kas tidak ditemukan untuk reversal pembayaran. Seed COA terlebih dahulu.')
+    }
+    if (remainingAmount > 0 && !piutang) {
+      throw new Error('Akun Piutang Usaha tidak ditemukan untuk reversal kredit. Seed COA terlebih dahulu.')
+    }
+    if (totalCogs > 0 && (!hpp || !persediaan)) {
+      throw new Error('Akun HPP atau Persediaan tidak ditemukan untuk reversal stok. Seed COA terlebih dahulu.')
+    }
 
     await tx.run(
       `INSERT INTO journal_entries (id, user_id, journal_number, entry_date, description, reference_type, reference_id, status, created_at, updated_at, sync_status, updated_at_local)
@@ -736,7 +807,7 @@ export const sqliteFinanceService = {
     await tx.run(
       `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
        VALUES (?, ?, ?, ?, '4-4000', 'Pendapatan Penjualan', ?, 0, ?, 'pending', ?)`,
-      [uuid(), userId, journalId, pendapatan.id, total, now, now]
+      [uuid(), userId, journalId, pendapatan.id, round2(total), now, now]
     )
 
     // Kredit Kas (jika ada pembayaran)
@@ -744,7 +815,7 @@ export const sqliteFinanceService = {
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, '1-1000', 'Kas', 0, ?, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, kas.id, paidAmount, now, now]
+        [uuid(), userId, journalId, kas.id, round2(paidAmount), now, now]
       )
     }
 
@@ -753,7 +824,7 @@ export const sqliteFinanceService = {
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, '1-1100', 'Piutang Usaha', 0, ?, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, piutang.id, remainingAmount, now, now]
+        [uuid(), userId, journalId, piutang.id, round2(remainingAmount), now, now]
       )
     }
 
@@ -762,12 +833,12 @@ export const sqliteFinanceService = {
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, '1-1200', 'Persediaan Barang', ?, 0, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, persediaan.id, totalCogs, now, now]
+        [uuid(), userId, journalId, persediaan.id, round2(totalCogs), now, now]
       )
       await tx.run(
         `INSERT INTO journal_lines (id, user_id, journal_id, account_id, account_code, account_name, debit, credit, created_at, sync_status, updated_at_local)
          VALUES (?, ?, ?, ?, '5-5000', 'Harga Pokok Penjualan (HPP)', 0, ?, ?, 'pending', ?)`,
-        [uuid(), userId, journalId, hpp.id, totalCogs, now, now]
+        [uuid(), userId, journalId, hpp.id, round2(totalCogs), now, now]
       )
     }
 
@@ -778,6 +849,17 @@ export const sqliteFinanceService = {
    * Void jurnal yang terkait dengan transaksi (void transaction)
    */
   async voidJournalByReference(tx: TransactionExecutor, userId: string, referenceType: string, referenceId: string, now: string): Promise<void> {
+    // Cek apakah jurnal sudah void sebelumnya
+    const existing = await tx.query<any>(
+      `SELECT id, status FROM journal_entries 
+       WHERE reference_type = ? AND reference_id = ? AND user_id = ?`,
+      [referenceType, referenceId, userId]
+    )
+    
+    if (existing.length > 0 && existing[0].status === 'void') {
+      throw new Error('Jurnal sudah dibatalkan sebelumnya')
+    }
+
     await tx.run(
       `UPDATE journal_entries SET status = 'void', updated_at = ?, sync_status = 'pending', updated_at_local = ?
        WHERE reference_type = ? AND reference_id = ? AND user_id = ?`,

@@ -153,6 +153,9 @@ BEGIN
   INSERT INTO chart_of_accounts (user_id, code, name, type, normal_balance, is_system)
   VALUES (v_user_id, '2-2000', 'Utang Usaha', 'kewajiban', 'kredit', true)
   ON CONFLICT (user_id, code) DO NOTHING;
+  INSERT INTO chart_of_accounts (user_id, code, name, type, normal_balance, is_system)
+  VALUES (v_user_id, '2-2100', 'Hutang Gaji', 'kewajiban', 'kredit', true)
+  ON CONFLICT (user_id, code) DO NOTHING;
 
   -- Ekuitas
   INSERT INTO chart_of_accounts (user_id, code, name, type, normal_balance, is_system)

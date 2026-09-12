@@ -170,6 +170,7 @@ import SelectField from '@/components/common/SelectField.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import { useFinanceStore } from '@/stores/finance'
+import { localTodayStr } from '@/utils/date'
 
 const router = useRouter()
 const store = useFinanceStore()
@@ -184,7 +185,8 @@ interface Line {
 }
 
 const form = ref<{ entry_date: string; description: string; lines: Line[] }>({
-  entry_date: new Date().toISOString().split('T')[0],
+  // Tanggal lokal — jangan toISOString() (UTC = kemarin sebelum jam 07:00 WIB)
+  entry_date: localTodayStr(),
   description: '',
   lines: [{ account_id: '', debit: 0, credit: 0 }],
 })
@@ -226,6 +228,10 @@ const handleSubmit = async () => {
     formError.value = 'Tanggal wajib diisi'
     return
   }
+  if (isNaN(new Date(form.value.entry_date + 'T00:00:00').getTime())) {
+    formError.value = 'Tanggal tidak valid'
+    return
+  }
 
   const lines = form.value.lines.filter((l) => l.account_id)
   if (lines.length === 0) {
@@ -253,7 +259,8 @@ const handleSubmit = async () => {
       description: form.value.description.trim(),
       lines: lines.map((l) => ({ account_id: l.account_id, debit: l.debit || 0, credit: l.credit || 0 })),
     })
-    await store.fetchJournals()
+    // Jurnal sudah tersimpan — refresh daftar boleh gagal tanpa mengorbankan navigasi
+    await store.fetchJournals().catch(() => {})
     router.push(`/finance/journal/${id}`)
   } catch (e: any) {
     formError.value = e.message

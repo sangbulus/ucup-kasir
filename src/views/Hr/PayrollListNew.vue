@@ -240,13 +240,18 @@ const filterStartDate = ref('')
 const filterEndDate = ref('')
 
 const filteredPayrolls = computed(() => {
+  // Guard clause untuk prevent crash jika store.payrolls undefined/null
+  if (!store.payrolls || !Array.isArray(store.payrolls)) {
+    return []
+  }
+  
   let result = [...store.payrolls]
 
   if (filterSearch.value) {
     const search = filterSearch.value.toLowerCase()
     result = result.filter((p) =>
       p.period_code.toLowerCase().includes(search) ||
-      p.employee?.name.toLowerCase().includes(search)
+      p.employee?.name?.toLowerCase().includes(search)  // Optional chaining untuk safety
     )
   }
 

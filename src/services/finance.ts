@@ -140,10 +140,11 @@ export const financeService = {
     if (accErr) throw accErr
     const accList = (accounts || []) as Account[]
 
-    // Ambil semua baris jurnal yang belum void, sampai tanggal tertentu
+    // Ambil semua baris jurnal yang posted (bukan void/draft), sampai tanggal tertentu
     let query = supabase
       .from('journal_lines')
       .select('*, journal:journal_entries!inner(entry_date, status)')
+      .eq('journal.status', 'posted')  // Filter status di query, bukan di loop
       .order('created_at')
 
     if (endDate) {
@@ -159,7 +160,7 @@ export const financeService = {
       let totalDebit = 0
       let totalCredit = 0
       for (const l of lineList) {
-        if (l.account_id === acc.id && l.journal?.status !== 'void') {
+        if (l.account_id === acc.id) {
           totalDebit += Number(l.debit || 0)
           totalCredit += Number(l.credit || 0)
         }
@@ -188,11 +189,17 @@ export const financeService = {
     endDate?: string
   ): Promise<{ balance: number; entries: LedgerEntry[] }> {
     // Saldo awal sampai sebelum startDate. Tanpa startDate = 0 (semua baris sudah tercakup di rentang).
+    // Catatan: getAccountBalances mengembalikan saldo TERNORMALISASI (kredit = positif utk akun
+    // normal-kredit), sedangkan delta baris di bawah memakai basis debit-mentah (debit - credit).
+    // Konversi balik ke basis debit supaya kedua basis sama.
     let before = 0
     if (startDate) {
-      const prevDay = new Date(new Date(startDate).getTime() - 86400000).toISOString().split('T')[0]
+      // 'YYYY-MM-DD' + 'T00:00:00' = tengah malam LOKAL (bukan UTC) -> minus 1 hari = akhir hari sebelumnya
+      const prevDay = new Date(new Date(startDate + 'T00:00:00').getTime() - 86400000)
+        .toLocaleDateString('en-CA') // en-CA == format 'YYYY-MM-DD'
       const allBalances = await this.getAccountBalances(prevDay)
-      before = allBalances.find((b) => b.account_id === accountId)?.balance || 0
+      const found = allBalances.find((b) => b.account_id === accountId)
+      if (found) before = found.normal_balance === 'debit' ? found.balance : -found.balance
     }
 
     let query = supabase

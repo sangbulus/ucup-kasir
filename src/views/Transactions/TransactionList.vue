@@ -131,21 +131,34 @@
             <p class="text-xs font-bold text-blue-600 dark:text-blue-400">{{ transaction.transaction_number }}</p>
             <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ formatDate(transaction.created_at) }}</p>
           </div>
-          <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            <!-- Status Pembayaran -->
             <span
-              v-if="transaction.status === 'void' || transaction.status === 'batal'"
-              class="rounded-full bg-error-100 px-2 py-0.5 text-[10px] font-medium text-error-700 dark:bg-error-900 dark:text-error-400"
+              :class="[
+                'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                transaction.payment_status === 'lunas'
+                  ? 'bg-success-100 text-success-700 dark:bg-success-900 dark:text-success-400'
+                  : 'bg-warning-100 text-warning-700 dark:bg-warning-900 dark:text-warning-400'
+              ]"
             >
-              Batal
+              {{ transaction.payment_status === 'lunas' ? 'Lunas' : 'Belum Lunas' }}
             </span>
+            <!-- Status Pengiriman (jika tidak batal) -->
             <span
-              v-else
+              v-if="transaction.status !== 'void' && transaction.status !== 'batal'"
               :class="[
                 'rounded-full px-2 py-0.5 text-[10px] font-medium',
                 transactionStatusBadge(transaction.transaction_status).class
               ]"
             >
               {{ transactionStatusBadge(transaction.transaction_status).label }}
+            </span>
+            <!-- Status Batal -->
+            <span
+              v-else
+              class="rounded-full bg-error-100 px-2 py-0.5 text-[10px] font-medium text-error-700 dark:bg-error-900 dark:text-error-400"
+            >
+              Batal
             </span>
             <button
               @click.stop="toggleExpand(transaction.id)"

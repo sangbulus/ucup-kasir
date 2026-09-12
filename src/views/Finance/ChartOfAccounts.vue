@@ -404,11 +404,19 @@ const openEdit = (acc: Account) => {
   showAddModal.value = true
 }
 
+const seeding = ref(false)
 const handleSeed = async () => {
+  if (seeding.value) return
+  seeding.value = true
   try {
     await store.seedAccounts()
+    toast.success('Berhasil!', 'Akun default dimuat.')
   } catch (e: any) {
+    // formError hanya tampil di modal tambah — beri feedback juga via toast
     formError.value = e.message
+    toast.error('Gagal!', e.message)
+  } finally {
+    seeding.value = false
   }
 }
 

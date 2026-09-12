@@ -236,11 +236,14 @@ export const hrService = {
   },
 
   /** Post payroll journal via RPC (auto-jurnal ke finance) */
-  async postPayrollJournal(payrollId: string): Promise<void> {
-    const { error } = await supabase.rpc('post_payroll_journal', {
+  async postPayrollJournal(payrollId: string): Promise<Payroll> {
+    const { data, error } = await supabase.rpc('post_payroll_journal', {
       p_payroll_id: payrollId,
     })
     if (error) throw error
+    
+    // Fetch ulang untuk join employee (consistent dengan generatePayroll)
+    return this.getPayroll(data.id) as Promise<Payroll>
   },
 
   /** Delete payroll via RPC (akan hapus jurnal juga jika ada) */

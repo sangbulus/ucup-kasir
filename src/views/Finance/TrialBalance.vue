@@ -6,6 +6,18 @@
     <MobilePageHeader title="Neraca Saldo" subtitle="Trial Balance" back-to="/quick-menu/keuangan">
       <template #actions>
         <button
+          v-if="rows.length > 0"
+          @click="toggleViewMode"
+          class="mr-2 flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.03]"
+        >
+          <svg v-if="viewMode === 'list'" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+          </svg>
+        </button>
+        <button
           @click="showFilterModal = true"
           class="flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.03]"
         >
@@ -94,8 +106,8 @@
         </table>
       </div>
 
-        <!-- Mobile Cards -->
-        <div class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm md:hidden dark:border-gray-800 dark:bg-gray-900">
+        <!-- Mobile Cards - List View -->
+        <div v-if="viewMode === 'list'" class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm md:hidden dark:border-gray-800 dark:bg-gray-900">
         <div class="mb-2.5 border-b border-gray-200 pb-2 dark:border-gray-700">
           <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Neraca Saldo</h3>
         </div>
@@ -134,6 +146,55 @@
             <p class="text-[11px] font-bold text-red-700 dark:text-red-400">K: {{ formatCurrency(totalCredit) }}</p>
           </div>
         </div>
+        </div>
+
+        <!-- Mobile Table - Table View -->
+        <div v-else class="rounded-2xl border border-gray-200 bg-white shadow-sm md:hidden dark:border-gray-800 dark:bg-gray-900">
+          <div class="overflow-x-auto">
+            <div class="inline-block min-w-full align-middle">
+              <table class="min-w-full text-left">
+                <thead class="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+                  <tr>
+                    <th class="px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Kode</th>
+                    <th class="px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Nama Akun</th>
+                    <th class="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Debit</th>
+                    <th class="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Kredit</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+                  <tr
+                    v-for="row in rows"
+                    :key="row.account_id"
+                    @click="router.push(`/finance/ledger?account=${row.account_id}`)"
+                    class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <td class="px-2 py-2 font-mono text-[9px] font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">{{ row.account_code }}</td>
+                    <td class="px-2 py-2">
+                      <div class="min-w-[120px]">
+                        <p class="text-[10px] font-medium text-gray-900 dark:text-white line-clamp-2">{{ row.account_name }}</p>
+                        <span class="mt-0.5 inline-block rounded px-1 py-0.5 text-[8px] font-bold uppercase" :class="getTypeBadge(row.account_type)">
+                          {{ getTypeLabel(row.account_type) }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="px-2 py-2 text-right text-[10px] font-bold whitespace-nowrap" :class="row.debit ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-300 dark:text-gray-700'">
+                      {{ row.debit ? formatCurrency(row.debit) : '—' }}
+                    </td>
+                    <td class="px-2 py-2 text-right text-[10px] font-bold whitespace-nowrap" :class="row.credit ? 'text-red-600 dark:text-red-400' : 'text-gray-300 dark:text-gray-700'">
+                      {{ row.credit ? formatCurrency(row.credit) : '—' }}
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot class="border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+                  <tr>
+                    <td class="px-2 py-2 text-[9px] font-bold text-gray-700 dark:text-gray-300" colspan="2">Total</td>
+                    <td class="px-2 py-2 text-right text-[10px] font-bold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">{{ formatCurrency(totalDebit) }}</td>
+                    <td class="px-2 py-2 text-right text-[10px] font-bold text-red-700 dark:text-red-400 whitespace-nowrap">{{ formatCurrency(totalCredit) }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -208,6 +269,14 @@ const showFilterModal = ref(false)
 // Auto register/unregister modal di navigation stack
 useAutoNavigationStack(showFilterModal, 'trial-balance-filter-modal')
 
+// View mode state (list atau table) - simpan ke localStorage
+const viewMode = ref<'list' | 'table'>((localStorage.getItem('trial-balance-view-mode') as 'list' | 'table') || 'list')
+
+const toggleViewMode = () => {
+  viewMode.value = viewMode.value === 'list' ? 'table' : 'list'
+  localStorage.setItem('trial-balance-view-mode', viewMode.value)
+}
+
 const endDate = ref<string | undefined>(undefined)
 const tempEnd = ref('')
 
@@ -228,7 +297,8 @@ const rows = computed(() =>
 
 const totalDebit = computed(() => rows.value.reduce((s, r) => s + r.debit, 0))
 const totalCredit = computed(() => rows.value.reduce((s, r) => s + r.credit, 0))
-const balanced = computed(() => totalDebit.value === totalCredit.value)
+// Toleransi Rp0,5 — jangan `===` murni (pembulatan format bisa menipu)
+const balanced = computed(() => Math.abs(totalDebit.value - totalCredit.value) < 0.51)
 
 const getTypeLabel = (type: string) => {
   const labels: Record<string, string> = {
@@ -259,15 +329,21 @@ const formatPeriod = () => {
   return new Date(endDate.value).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+// Anti race-condition: respons request lama tidak boleh menimpa hasil request baru
+let fetchSeq = 0
 const fetchData = async () => {
+  const seq = ++fetchSeq
   loading.value = true
   error.value = null
   try {
-    balances.value = await store.getAccountBalances(endDate.value || undefined)
+    const result = await store.getAccountBalances(endDate.value || undefined)
+    if (seq !== fetchSeq) return
+    balances.value = result
   } catch (e: any) {
+    if (seq !== fetchSeq) return
     error.value = e.message
   } finally {
-    loading.value = false
+    if (seq === fetchSeq) loading.value = false
   }
 }
 

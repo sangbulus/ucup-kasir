@@ -689,6 +689,8 @@
     <DatePickerModal
       v-model="showDatePicker"
       :value="transactionDate"
+      :max-date="maxDate"
+      :show-time="false"
       @update:value="transactionDate = $event"
     />
   </AdminLayout>
@@ -735,8 +737,11 @@ const showDatePicker = ref(false)
 // Format datetime-local value dari Date (YYYY-MM-DDTHH:mm)
 const formatDateTimeLocal = (date: Date) => {
   const pad = (n: number) => n.toString().padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
+
+// P2 FIX: Computed property untuk max date (today) - mencegah pilih tanggal masa depan
+const maxDate = computed(() => formatDateTimeLocal(new Date()))
 
 // Tampilan tanggal custom (id-ID) dari nilai datetime-local
 const formatDateDisplay = (value: string) => {
@@ -934,6 +939,16 @@ const handleSubmit = async () => {
 
   if (cartItems.length === 0) {
     toast.error('Gagal!', 'Belum ada produk di keranjang')
+    return
+  }
+
+  // P2 FIX: Validasi tanggal transaksi tidak boleh masa depan
+  // Bandingkan sebagai string YYYY-MM-DD — hindari bug timezone:
+  // `new Date('YYYY-MM-DD')` di-parse sebagai UTC midnight, bukan tengah malam lokal,
+  // sehingga transaksi "hari ini" bisa salah ditolak sebelum jam 07:00 WIB.
+  const todayStr = formatDateTimeLocal(new Date())
+  if (transactionDate.value > todayStr) {
+    toast.error('Gagal!', 'Tanggal transaksi tidak boleh di masa depan. Maksimal hari ini.')
     return
   }
 

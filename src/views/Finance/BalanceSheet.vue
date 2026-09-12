@@ -271,7 +271,8 @@ const currentProfit = computed(() => {
 
 const totalEquityWithProfit = computed(() => totalEquity.value + currentProfit.value)
 const totalLiabilitiesEquity = computed(() => totalLiabilities.value + totalEquityWithProfit.value)
-const isBalanced = computed(() => totalAssets.value === totalLiabilitiesEquity.value)
+// Toleransi Rp0,5 — jangan `===` murni (pembulatan bisa menipu tampilan balance)
+const isBalanced = computed(() => Math.abs(totalAssets.value - totalLiabilitiesEquity.value) < 0.51)
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('id-ID', {
@@ -283,15 +284,21 @@ const formatPeriod = () => {
   return new Date(endDate.value).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+// Anti race-condition: respons request lama tidak boleh menimpa hasil request baru
+let fetchSeq = 0
 const fetchData = async () => {
+  const seq = ++fetchSeq
   loading.value = true
   error.value = null
   try {
-    accounts.value = await store.getAccountBalances(endDate.value || undefined)
+    const result = await store.getAccountBalances(endDate.value || undefined)
+    if (seq !== fetchSeq) return
+    accounts.value = result
   } catch (e: any) {
+    if (seq !== fetchSeq) return
     error.value = e.message
   } finally {
-    loading.value = false
+    if (seq === fetchSeq) loading.value = false
   }
 }
 

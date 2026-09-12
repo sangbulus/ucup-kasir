@@ -24,6 +24,17 @@
       </div>
     </div>
 
+    <!-- Error -->
+    <div v-else-if="loadError" class="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-500/30 dark:bg-red-500/10">
+      <p class="text-sm text-red-600 dark:text-red-400">{{ loadError }}</p>
+      <button
+        @click="fetchData"
+        class="mt-2 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-500/10"
+      >
+        Coba Lagi
+      </button>
+    </div>
+
     <!-- Content -->
     <div v-else class="space-y-4 pb-6">
       <!-- Filter Pills (Mobile) -->
@@ -304,16 +315,21 @@ import MobilePageHeader from '@/components/common/MobilePageHeader.vue'
 import DateField from '@/components/common/DateField.vue'
 import { useFinanceStore } from '@/stores/finance'
 import { useNavigationStack } from '@/composables/useNavigationStack'
+import { useToast } from '@/composables/useToast'
+import { localTodayStr, localDateOffsetStr, localDateStr } from '@/utils/date'
 
 const router = useRouter()
 const store = useFinanceStore()
 const { registerModal, unregisterModal } = useNavigationStack()
 
+const toast = useToast()
+
 const showFilterModal = ref(false)
+const loadError = ref<string | null>(null)
 const tempRange = ref('thisMonth')
 const tempCustom = ref({
-  start: new Date().toISOString().split('T')[0],
-  end: new Date().toISOString().split('T')[0],
+  start: localTodayStr(),
+  end: localTodayStr(),
 })
 
 const rangeOptions = [
@@ -347,8 +363,10 @@ const assetBalances = computed(() =>
   balances.value.filter((b) => b.account_type === 'aset' && b.balance !== 0)
 )
 
+// Saldo bertanda (konsisten dengan Neraca) — Math.abs membuat kas overdraw
+// terlihat sebagai aset positif sehingga total bertentangan dengan halaman Neraca
 const totalAssets = computed(() =>
-  assetBalances.value.reduce((sum, b) => sum + Math.abs(b.balance), 0)
+  assetBalances.value.reduce((sum, b) => sum + b.balance, 0)
 )
 
 // Laba bersih = pendapatan − beban (dari saldo akun)
@@ -367,18 +385,30 @@ const setPeriod = (start: string, end: string) => {
   endDate.value = end
 }
 
+// Anti race-condition + tangani error (sebelumnya tanpa try/catch → unhandled rejection,
+// kartu diam-diam Rp0 saat jaringan bermasalah)
+let fetchSeq = 0
 const fetchData = async () => {
-  const [bal, cf] = await Promise.all([
-    store.getAccountBalances(endDate.value || undefined),
-    store.getCashFlow(startDate.value || undefined, endDate.value || undefined),
-  ])
-  balances.value = bal
-  cashFlow.value = cf
+  const seq = ++fetchSeq
+  loadError.value = null
+  try {
+    const [bal, cf] = await Promise.all([
+      store.getAccountBalances(endDate.value || undefined),
+      store.getCashFlow(startDate.value || undefined, endDate.value || undefined),
+    ])
+    if (seq !== fetchSeq) return
+    balances.value = bal
+    cashFlow.value = cf
+  } catch (e: any) {
+    if (seq !== fetchSeq) return
+    loadError.value = e.message || 'Gagal memuat data keuangan'
+    toast.error('Gagal!', loadError.value || 'Gagal memuat data keuangan')
+  }
 }
 
 const applyFilter = () => {
-  const today = new Date()
-  const endIso = today.toISOString().split('T')[0]
+  // Tanggal lokal — hindari bug UTC (toISOString = kemarin sebelum jam 07:00 WIB)
+  const endIso = localTodayStr()
 
   let start = ''
   switch (tempRange.value) {
@@ -386,19 +416,16 @@ const applyFilter = () => {
       start = endIso
       break
     case '7days':
-      const d7 = new Date(today)
-      d7.setDate(today.getDate() - 6)
-      start = d7.toISOString().split('T')[0]
+      start = localDateOffsetStr(-6)
       break
     case '30days':
-      const d30 = new Date(today)
-      d30.setDate(today.getDate() - 29)
-      start = d30.toISOString().split('T')[0]
+      start = localDateOffsetStr(-29)
       break
     default:
       start = tempCustom.value.start
   }
-  const end = tempRange.value === 'thisMonth' ? endIso : tempCustom.value.end
+  // Preset quick-range selalu berakhir hari ini (bukan nilai custom tertinggal)
+  const end = tempRange.value === 'custom' ? tempCustom.value.end || endIso : endIso
 
   setPeriod(start, end)
   showFilterModal.value = false
@@ -435,11 +462,11 @@ watch(showFilterModal, (isOpen) => {
 })
 
 onMounted(async () => {
-  // Default: bulan ini
+  // Default: bulan ini (tanggal lokal, bukan UTC)
   const today = new Date()
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
-  setPeriod(firstDay.toISOString().split('T')[0], today.toISOString().split('T')[0])
-  tempCustom.value.end = today.toISOString().split('T')[0]
+  setPeriod(localDateStr(firstDay), localTodayStr())
+  tempCustom.value.end = localTodayStr()
   await fetchData()
 })
 </script>

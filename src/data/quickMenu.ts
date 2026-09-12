@@ -259,14 +259,6 @@ export const DEFAULT_QUICK_MENU: QuickMenuItem[] = [
     iconPath: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
   },
   {
-    id: 'hr-attendance',
-    to: '/hr/attendance',
-    label: 'Absensi',
-    description: 'Rekap kehadiran & izin karyawan',
-    iconClass: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500',
-    iconPath: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zm6-8l2 2 4-4',
-  },
-  {
     id: 'hr-loans',
     to: '/hr/loans',
     label: 'Kasbon',
@@ -281,14 +273,6 @@ export const DEFAULT_QUICK_MENU: QuickMenuItem[] = [
     description: 'Penggajian & slip gaji karyawan',
     iconClass: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500',
     iconPath: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-  },
-  {
-    id: 'hr-payroll-components',
-    to: '/hr/payroll/components',
-    label: 'Komponen',
-    description: 'Komponen tunjangan & potongan gaji',
-    iconClass: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500',
-    iconPath: 'M4 6h16M4 10h16M4 14h16M4 18h16',
   },
 ]
 
@@ -361,12 +345,9 @@ export const GROUP_MAP: Record<string, string> = {
   'shipping-deliveries': 'Pengiriman',
   'shipping-vehicles': 'Pengiriman',
   // Karyawan & Payroll
-  hr: 'Karyawan & Payroll',
   'hr-employees': 'Karyawan & Payroll',
-  'hr-attendance': 'Karyawan & Payroll',
   'hr-loans': 'Karyawan & Payroll',
   'hr-payroll': 'Karyawan & Payroll',
-  'hr-payroll-components': 'Karyawan & Payroll',
 }
 
 /** Mapping id menu → subgrup (dipakai di halaman "Lihat Semua") */
@@ -404,12 +385,9 @@ export const SUBGROUP_MAP: Record<string, string> = {
   'shipping-deliveries': 'Operasional',
   'shipping-vehicles': 'Operasional',
   // Karyawan & Payroll
-  hr: 'Ringkasan',
   'hr-employees': 'Master Data',
-  'hr-attendance': 'Absensi & Payroll',
-  'hr-loans': 'Absensi & Payroll',
-  'hr-payroll': 'Absensi & Payroll',
-  'hr-payroll-components': 'Absensi & Payroll',
+  'hr-loans': 'Payroll',
+  'hr-payroll': 'Payroll',
 }
 
 /** Urutan tampil subgrup per grup di halaman "Lihat Semua" */
@@ -419,7 +397,7 @@ export const SUBGROUP_ORDER: Record<string, string[]> = {
   keuangan: ['Ringkasan', 'Pencatatan', 'Laporan Keuangan'],
   pembelian: ['Ringkasan', 'Master Supplier', 'Transaksi Pembelian'],
   pengiriman: ['Ringkasan', 'Operasional'],
-  karyawan: ['Ringkasan', 'Master Data', 'Absensi & Payroll'],
+  karyawan: ['Master Data', 'Payroll'],
 }
 
 /** Muat urutan menu dari localStorage; fallback ke default. */

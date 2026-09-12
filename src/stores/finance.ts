@@ -99,7 +99,8 @@ export const useFinanceStore = defineStore('finance', () => {
       await financeServiceAdapter.deleteAccount(id)
       accounts.value = accounts.value.filter((a) => a.id !== id)
     } catch (e: any) {
-      if (oldAccount && index !== -1) accounts.value.splice(index, 0, oldAccount)
+      // Tidak perlu rollback: kalau throw, filter di atas tidak pernah jalan,
+      // jadi daftar akun masih utuh. (Dulu splice() di sini malahan Duplikat akun.)
       error.value = e.message
       throw e
     } finally {
@@ -164,7 +165,8 @@ export const useFinanceStore = defineStore('finance', () => {
       await financeServiceAdapter.deleteJournal(id)
       journals.value = journals.value.filter((j) => j.id !== id)
     } catch (e: any) {
-      if (oldJournal && index !== -1) journals.value.splice(index, 0, oldJournal)
+      // Tidak perlu rollback: kalau throw, filter di atas tidak pernah jalan.
+      // (Dulu splice() di sini malahan Duplikat jurnal.)
       error.value = e.message
       throw e
     } finally {

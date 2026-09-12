@@ -314,7 +314,8 @@ export const sqliteTransactionsService = {
         remaining,
         totalCogs,
         transactionDate,
-        now
+        now,
+        input.payment_method
       )
     }).then(async () => {
       // Queue header transaksi (items/payments ikut di payload →
@@ -398,14 +399,15 @@ export const sqliteTransactionsService = {
         ]
       )
 
-      // Auto-jurnal: pindahkan Piutang → Kas
+      // Auto-jurnal: pindahkan Piutang → Kas/Bank
       autoJournalId = await sqliteFinanceService.postPaymentJournal(
         tx,
         userId,
         transactionId,
         amount,
         txn.transaction_number,
-        now
+        now,
+        paymentMethod
       )
     })
 
@@ -436,12 +438,20 @@ export const sqliteTransactionsService = {
     const deletedJournalIds: string[] = []
 
     await transaction(async (tx) => {
-      // Hapus baris jurnal & jurnal terkait (agar tidak orphan)
+      // Cek apakah transaksi sudah memiliki jurnal posted (blok delete jika sudah ada)
       const journals = await tx.query<any>(
-        `SELECT id FROM journal_entries WHERE reference_type IN ('transaction', 'payment', 'void')
+        `SELECT id, status FROM journal_entries WHERE reference_type IN ('transaction', 'payment', 'void')
          AND reference_id = ? AND user_id = ?`,
         [id, userId]
       )
+      
+      // Hanya blok jika ada jurnal yang posted (jurnal draft boleh dihapus)
+      const hasPostedJournal = journals.some((j: any) => j.status === 'posted')
+      if (hasPostedJournal) {
+        throw new Error('Transaksi tidak dapat dihapus karena sudah memiliki jurnal. Gunakan void untuk membatalkan transaksi.')
+      }
+
+      // Hapus baris jurnal & jurnal terkait (jika ada jurnal draft)
       for (const j of journals) {
         deletedJournalIds.push(j.id)
         await tx.run(
@@ -490,20 +500,90 @@ export const sqliteTransactionsService = {
     }
   },
 
+  /**
+   * Replikasi fungsi RPC void_transaction:
+   * 1. Cek status transaksi (jangan void yang sudah batal)
+   * 2. Kembalikan stok produk dari tiap item
+   * 3. Void jurnal yang terkait dengan transaksi
+   * 4. Buat jurnal reversal baru (void)
+   * 5. Tandai transaksi sebagai batal
+   */
   async void(id: string): Promise<void> {
     const userId = getCurrentUserId()
     const now = nowIso()
+    let autoJournalId: string | null = null
 
     await transaction(async (tx) => {
+      // Ambil transaksi
+      const txnRows = await tx.query<any>(
+        `SELECT id, status, transaction_number, total, paid_amount, remaining_amount FROM transactions
+         WHERE id = ? AND user_id = ?`,
+        [id, userId]
+      )
+      const txn = txnRows[0]
+      if (!txn) throw new Error('Transaksi tidak ditemukan')
+      if (txn.status === 'batal') throw new Error('Transaksi sudah dibatalkan sebelumnya')
+
+      // Hitung total HPP untuk reversal
+      let totalCogs = 0
+      const items = await tx.query<any>(
+        `SELECT ti.product_id, ti.quantity, p.price_buy
+         FROM transaction_items ti
+         LEFT JOIN products p ON p.id = ti.product_id
+         WHERE ti.transaction_id = ? AND ti.user_id = ?`,
+        [id, userId]
+      )
+      
+      for (const item of items) {
+        totalCogs += (item.price_buy || 0) * item.quantity
+        
+        // Kembalikan stok
+        if (item.product_id) {
+          const before = await tx.query<any>('SELECT stock FROM products WHERE id = ? AND user_id = ?', [item.product_id, userId])
+          const after = before[0] ? before[0].stock + item.quantity : item.quantity
+          await tx.run(
+            `UPDATE products SET stock = ?, updated_at = ?, sync_status = 'pending', updated_at_local = ?
+             WHERE id = ? AND user_id = ?`,
+            [after, now, now, item.product_id, userId]
+          )
+        }
+      }
+
+      // Tandai transaksi sebagai batal
       await tx.run(
-        `UPDATE transactions SET status = 'void', updated_at = ?, sync_status = 'pending', updated_at_local = ?
+        `UPDATE transactions SET status = 'batal', updated_at = ?, sync_status = 'pending', updated_at_local = ?
          WHERE id = ? AND user_id = ?`,
         [now, now, id, userId]
+      )
+
+      // Void jurnal lama (set status = 'void')
+      await sqliteFinanceService.voidJournalByReference(tx, userId, 'transaction', id, now)
+      await sqliteFinanceService.voidJournalByReference(tx, userId, 'payment', id, now)
+
+      // Buat jurnal reversal baru
+      autoJournalId = await sqliteFinanceService.postVoidJournal(
+        tx,
+        userId,
+        id,
+        txn.transaction_number,
+        txn.total,
+        txn.paid_amount,
+        txn.remaining_amount,
+        totalCogs,
+        now
       )
     })
 
     const txn = await this.getById(id)
     if (txn) await addToSyncQueue('UPDATE', 'transactions', id, txn)
+
+    // Queue jurnal void
+    if (autoJournalId) {
+      const journal = await sqliteFinanceService.getJournal(autoJournalId)
+      if (journal) {
+        await addToSyncQueue('INSERT', 'journal_entries', autoJournalId, journal)
+      }
+    }
   },
 
   /** Ubah status transaksi (disiapkan/dikirim/selesai). */

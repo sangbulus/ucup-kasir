@@ -6,9 +6,6 @@ import type {
   EmployeeInsert,
   EmployeeUpdate,
   EmployeeWithStats,
-  Attendance,
-  AttendanceInsert,
-  AttendanceUpdate,
   Payroll,
   PayrollInsert,
   PayrollUpdate,
@@ -22,7 +19,6 @@ import type {
 // ============================================================
 // Store: HR & Payroll — Manajemen Karyawan
 // - Master: Karyawan (jabatan = teks 'supir' | 'loader')
-// - Absensi
 // - Payroll per-karyawan (periode individual, input kasbon manual)
 // - Kasbon (employee_loans)
 // ============================================================
@@ -31,9 +27,10 @@ export const useHrStore = defineStore('hr', () => {
   // ============================================================
   // State
   // ============================================================
+  // State
+  // ============================================================
   const employees = ref<Employee[]>([])
   const employeesWithStats = ref<EmployeeWithStats[]>([])
-  const attendance = ref<Attendance[]>([])
   const payrolls = ref<Payroll[]>([])
   const employeeLoans = ref<EmployeeLoan[]>([])
   const loading = ref(false)
@@ -136,85 +133,6 @@ export const useHrStore = defineStore('hr', () => {
   }
 
   // ============================================================
-  // ATTENDANCE
-  // ============================================================
-
-  async function fetchAttendance(startDate?: string, endDate?: string) {
-    loading.value = true
-    error.value = null
-    try {
-      attendance.value = await hrServiceAdapter.fetchAttendance(startDate, endDate)
-      return attendance.value
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function createAttendance(input: AttendanceInsert) {
-    loading.value = true
-    error.value = null
-    try {
-      const created = await hrServiceAdapter.createAttendance(input)
-      attendance.value.unshift(created)
-      return created
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function updateAttendance(id: string, updates: AttendanceUpdate) {
-    loading.value = true
-    error.value = null
-    const index = attendance.value.findIndex((a) => a.id === id)
-    const old = index !== -1 ? { ...attendance.value[index] } : null
-    try {
-      const updated = await hrServiceAdapter.updateAttendance(id, updates)
-      if (index !== -1) attendance.value[index] = updated
-      return updated
-    } catch (e: any) {
-      if (old && index !== -1) attendance.value[index] = old
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function deleteAttendance(id: string) {
-    loading.value = true
-    error.value = null
-    try {
-      await hrServiceAdapter.deleteAttendance(id)
-      attendance.value = attendance.value.filter((a) => a.id !== id)
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function bulkCreateAttendance(records: AttendanceInsert[]) {
-    loading.value = true
-    error.value = null
-    try {
-      const count = await hrServiceAdapter.bulkCreateAttendance(records)
-      return count
-    } catch (e: any) {
-      error.value = e.message
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // ============================================================
   // PAYROLLS (Per-Karyawan dengan Periode Individual)
   // ============================================================
 
@@ -309,10 +227,20 @@ export const useHrStore = defineStore('hr', () => {
   async function postPayrollJournal(payrollId: string) {
     loading.value = true
     error.value = null
+    
+    // Simpan index untuk update langsung di array
+    const index = payrolls.value.findIndex((p) => p.id === payrollId)
+    
     try {
-      await hrServiceAdapter.postPayrollJournal(payrollId)
-      // Refresh untuk update status + journal_entry_id
-      await fetchPayrolls()
+      // Service sekarang return updated payroll
+      const updated = await hrServiceAdapter.postPayrollJournal(payrollId)
+      
+      // Update langsung di store tanpa refetch (lebih cepat & no race condition)
+      if (index !== -1) {
+        payrolls.value[index] = updated
+      }
+      
+      return updated
     } catch (e: any) {
       error.value = e.message
       throw e
@@ -421,7 +349,6 @@ export const useHrStore = defineStore('hr', () => {
   return {
     employees,
     employeesWithStats,
-    attendance,
     payrolls,
     employeeLoans,
     loading,
@@ -432,11 +359,6 @@ export const useHrStore = defineStore('hr', () => {
     createEmployee,
     updateEmployee,
     deleteEmployee,
-    fetchAttendance,
-    createAttendance,
-    updateAttendance,
-    deleteAttendance,
-    bulkCreateAttendance,
     fetchPayrolls,
     getPayroll,
     generatePayroll,

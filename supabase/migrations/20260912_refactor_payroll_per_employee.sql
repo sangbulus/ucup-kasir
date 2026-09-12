@@ -161,7 +161,9 @@ BEGIN
   v_base_salary := COALESCE(NULLIF(v_employee.base_salary, 0), COALESCE(v_employee.position_salary, 0), 0);
   
   -- ============================================================
-  -- Hitung insentif bongkar muat dari surat jalan
+  -- Hitung insentif dari surat jalan
+  -- 1. Untuk LOADER: insentif bongkar muat (bagi rata nilai muatan)
+  -- 2. Untuk SUPIR: gaji supir dari driver_fee
   -- ============================================================
   v_incentive := 0;
   
@@ -169,7 +171,7 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM delivery_loaders l WHERE l.employee_id = p_employee_id
   ) THEN
-    -- Loop semua surat jalan selesai dalam periode
+    -- Loop semua surat jalan selesai dalam periode untuk loader
     FOR v_do IN
       SELECT dor.id,
              COALESCE((
@@ -199,6 +201,19 @@ BEGIN
       END IF;
     END LOOP;
   END IF;
+  
+  -- Cek apakah karyawan adalah supir (driver)
+  -- Tambahkan driver_fee dari semua surat jalan yang dia kendarai
+  v_incentive := v_incentive + COALESCE((
+    SELECT SUM(dor.driver_fee)
+    FROM delivery_orders dor
+    WHERE dor.user_id = v_user_id
+      AND dor.status = 'selesai'
+      AND dor.do_date BETWEEN p_period_start AND p_period_end
+      AND dor.driver_id = p_employee_id
+      AND dor.driver_fee IS NOT NULL
+      AND dor.driver_fee > 0
+  ), 0);
   
   -- Hitung gaji bersih
   v_net := v_base_salary + v_incentive - COALESCE(p_kasbon_deduction, 0);

@@ -287,12 +287,15 @@ const formatGender = (g?: string) => {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value || 0)
 
-const filteredAttendance = computed(() => {
-  return store.attendance.filter((a) => {
-    if (a.employee_id !== route.params.id) return false
-    if (attFilterMonth.value && !a.attendance_date.startsWith(attFilterMonth.value)) return false
-    return true
-  }).sort((a, b) => b.attendance_date.localeCompare(a.attendance_date))
+// Attendance system removed - feature not implemented yet
+const filteredAttendance = computed<Array<{
+  id: string
+  attendance_date: string
+  check_in?: string
+  check_out?: string
+  status: string
+}>>(() => {
+  return []
 })
 
 const payrollHistory = ref<Payroll[]>([])
@@ -311,10 +314,7 @@ const getPayrollStatusLabel = (status: string) => (status === 'paid' ? 'Dibayar'
 
 onMounted(async () => {
   try {
-    await Promise.all([
-      store.fetchEmployees(),
-      store.fetchAttendance(),
-    ])
+    await store.fetchEmployees()
     // Riwayat slip gaji langsung per karyawan (sistem per-karyawan)
     payrollHistory.value = await store.fetchPayrolls(route.params.id as string)
   } catch (e: any) {
